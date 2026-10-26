@@ -355,6 +355,23 @@ class KeyboardController {
           this.app.imageModule.openCropModal(img);
         };
       }
+      const captionBtn = block.querySelector('.caption-toggle-btn');
+      const card = block.querySelector('.image-card');
+      if (captionBtn && card) {
+        captionBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.app.imageModule.toggleCaption(card, captionBtn);
+        };
+      }
+      const removeBtn = block.querySelector('.caption-remove-btn');
+      if (removeBtn && card) {
+        removeBtn.onclick = (e) => {
+          e.stopPropagation();
+          card.querySelector('.image-caption-wrapper')?.remove();
+          if (captionBtn) captionBtn.textContent = '💬 + Caption';
+          if (this.app.history) this.app.history.pushState('remove_caption');
+        };
+      }
     }
   }
 

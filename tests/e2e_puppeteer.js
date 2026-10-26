@@ -101,6 +101,23 @@ async function runTests() {
     });
     assert(cropApplied, 'Apply crop executes HTML5 slice and closes dialog smoothly');
 
+    const captionToggleWorked = await page.evaluate(() => {
+      const card = document.querySelector('.image-card');
+      const toggleBtn = card.querySelector('.caption-toggle-btn');
+      if (!card || !toggleBtn) return false;
+
+      // 1. Remove caption
+      toggleBtn.click();
+      const removed = !card.querySelector('.image-caption-wrapper');
+
+      // 2. Add caption back
+      toggleBtn.click();
+      const addedBack = !!card.querySelector('.image-caption-wrapper');
+
+      return removed && addedBack;
+    });
+    assert(captionToggleWorked, 'Image caption can be toggled on/off on demand via toolbar');
+
     // TEST 5: Pop-Out Detaching via Margin Grip (:::)
     console.log('\n--- 5. Pop-Out Detaching Engine ---');
     const popOutResult = await page.evaluate(() => {

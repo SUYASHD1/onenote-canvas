@@ -200,7 +200,16 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+.image-caption-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 4px;
+}
+
 .image-caption {
+  flex: 1;
   font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
@@ -211,6 +220,30 @@
 
 .image-caption:focus {
   border-bottom-color: var(--primary-purple);
+  color: var(--text-main);
+}
+
+.caption-remove-btn {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  line-height: 1;
+  color: #999999;
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0;
+  border-radius: 2px;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.image-card:hover .caption-remove-btn,
+.image-caption-wrapper:focus-within .caption-remove-btn {
+  opacity: 1;
+}
+
+.caption-remove-btn:hover {
+  color: #d83b01;
+  background: #f3f2f1;
 }
 
 /* Crop Modal */

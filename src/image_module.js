@@ -84,6 +84,15 @@ class ImageModule {
       this.openCropModal(img);
     };
 
+    const captionBtn = document.createElement('button');
+    captionBtn.className = 'image-tool-btn caption-toggle-btn';
+    captionBtn.textContent = captionText ? '💬 Caption' : '💬 + Caption';
+    captionBtn.title = 'Add or Remove Caption';
+    captionBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.toggleCaption(card, captionBtn);
+    };
+
     const delBtn = document.createElement('button');
     delBtn.className = 'image-tool-btn';
     delBtn.textContent = '× Delete';
@@ -93,6 +102,7 @@ class ImageModule {
     };
 
     tools.appendChild(cropBtn);
+    tools.appendChild(captionBtn);
     tools.appendChild(delBtn);
 
     container.appendChild(img);
@@ -133,17 +143,82 @@ class ImageModule {
       window.addEventListener('mouseup', onMouseUp);
     });
 
-    // Caption permanently locked to image
+    card.appendChild(container);
+
+    // Optional caption locked to image if provided
+    if (captionText) {
+      const captionWrapper = this.createCaptionWrapper(card, captionBtn, captionText);
+      card.appendChild(captionWrapper);
+    }
+
+    block.appendChild(card);
+    return block;
+  }
+
+  /**
+   * Toggle caption on/off for an image card
+   */
+  toggleCaption(card, captionBtn, defaultText = 'Click to add caption...') {
+    const existing = card.querySelector('.image-caption-wrapper');
+    if (existing) {
+      existing.remove();
+      if (captionBtn) captionBtn.textContent = '💬 + Caption';
+      if (this.app.history) this.app.history.pushState('remove_caption');
+    } else {
+      const wrapper = this.createCaptionWrapper(card, captionBtn, defaultText);
+      card.appendChild(wrapper);
+      const textEl = wrapper.querySelector('.image-caption');
+      textEl.focus();
+      const range = document.createRange();
+      range.selectNodeContents(textEl);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      if (captionBtn) captionBtn.textContent = '💬 Caption';
+      if (this.app.history) this.app.history.pushState('add_caption');
+    }
+  }
+
+  /**
+   * Create interactive caption wrapper with auto-remove & delete button
+   */
+  createCaptionWrapper(card, captionBtn, text = 'Click to add caption...') {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-caption-wrapper';
+
     const caption = document.createElement('div');
     caption.className = 'image-caption';
     caption.contentEditable = 'true';
-    caption.textContent = captionText;
+    caption.textContent = text;
 
-    card.appendChild(container);
-    card.appendChild(caption);
-    block.appendChild(card);
+    caption.addEventListener('input', () => {
+      if (this.app.history) this.app.history.debouncePush('edit_caption');
+    });
 
-    return block;
+    // Auto-remove if backspace on empty caption
+    caption.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && caption.innerText.trim().length === 0) {
+        e.preventDefault();
+        wrapper.remove();
+        if (captionBtn) captionBtn.textContent = '💬 + Caption';
+        if (this.app.history) this.app.history.pushState('remove_caption');
+      }
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'caption-remove-btn';
+    removeBtn.title = 'Remove Caption';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = (e) => {
+      e.stopPropagation();
+      wrapper.remove();
+      if (captionBtn) captionBtn.textContent = '💬 + Caption';
+      if (this.app.history) this.app.history.pushState('remove_caption');
+    };
+
+    wrapper.appendChild(caption);
+    wrapper.appendChild(removeBtn);
+    return wrapper;
   }
 
   /**

@@ -75,6 +75,7 @@ class OneNoteApp {
     this.selectedNoteBox = box;
     if (visuallyHighlight && box) {
       box.setSelected(true);
+      window.getSelection()?.removeAllRanges();
       if (document.activeElement && document.activeElement.isContentEditable) {
         document.activeElement.blur();
       }
@@ -84,6 +85,7 @@ class OneNoteApp {
   deselectAll() {
     this.noteBoxes.forEach(b => b.setSelected(false));
     this.selectedNoteBox = null;
+    window.getSelection()?.removeAllRanges();
   }
 
   /**

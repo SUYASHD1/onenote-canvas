@@ -169,6 +169,11 @@ class TableModule {
     // Wrapper container
     const wrapper = document.createElement('div');
     wrapper.className = 'table-wrapper';
+    wrapper.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
+      wrapper.classList.add('active-selected');
+    });
 
     // Toolbar with layout switcher and row/col actions
     const toolbar = document.createElement('div');

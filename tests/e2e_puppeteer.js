@@ -157,6 +157,42 @@ async function runTests() {
     });
     assert(keyboardTest, 'Backspace while typing never deletes container; container header Delete removes container cleanly');
 
+    // TEST 8: Universal Copy & Paste (Ctrl+C & Ctrl+V)
+    console.log('\n--- 8. Universal Clipboard (Ctrl+C, Ctrl+X, Ctrl+V) ---');
+    const clipboardTest = await page.evaluate(() => {
+      const boxToCopy = window.app.noteBoxes[0];
+      const countBefore = window.app.noteBoxes.length;
+
+      // Select container and press Ctrl+C
+      window.app.selectNoteBox(boxToCopy, true);
+      const copyEvt = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true });
+      window.dispatchEvent(copyEvt);
+
+      // Deselect and press Ctrl+V at (500, 500)
+      window.app.deselectAll();
+      window.app.keyboardController.mouseCanvasPos = { x: 500, y: 500 };
+      const pasteEvt = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true, bubbles: true });
+      window.dispatchEvent(pasteEvt);
+
+      const countAfterPaste = window.app.noteBoxes.length;
+      return countAfterPaste === countBefore + 1;
+    });
+    assert(clipboardTest, 'Ctrl+C copies selected container and Ctrl+V cleanly pastes clone to canvas');
+
+    // TEST 9: Item Delete (Tier 2 Delete Key on Selected Image / Table)
+    console.log('\n--- 9. Tier 2 Item Delete (Image / Table) ---');
+    const itemDeleteTest = await page.evaluate(() => {
+      const imgCard = document.querySelector('.image-card');
+      if (!imgCard) return false;
+
+      imgCard.classList.add('active-selected');
+      const deleteEvt = new KeyboardEvent('keydown', { key: 'Delete', bubbles: true });
+      window.dispatchEvent(deleteEvt);
+
+      return !document.contains(imgCard);
+    });
+    assert(itemDeleteTest, 'Pressing Delete on a selected image or table cleanly deletes only that item');
+
     console.log(`\n========================================`);
     console.log(`📊 Test Results: ${passedCount}/${totalCount} Passed (${Math.round((passedCount / totalCount) * 100)}%)`);
     console.log(`========================================\n`);

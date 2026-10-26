@@ -13,6 +13,11 @@
   max-width: 100%;
 }
 
+.table-wrapper.active-selected {
+  outline: 2px solid var(--primary-purple);
+  outline-offset: 2px;
+}
+
 .table-toolbar {
   display: flex;
   align-items: center;

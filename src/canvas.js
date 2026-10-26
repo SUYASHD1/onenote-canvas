@@ -56,7 +56,7 @@ class OneNoteCanvas {
     // Single click on empty canvas to deselect all
     this.stage.addEventListener('click', (e) => {
       if (!e.target.closest('.note-box') && !e.target.closest('.crop-modal')) {
-        document.querySelectorAll('.image-card.active-selected').forEach(c => c.classList.remove('active-selected'));
+        document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(c => c.classList.remove('active-selected'));
         if (this.onCanvasSingleClicked) {
           this.onCanvasSingleClicked();
         }

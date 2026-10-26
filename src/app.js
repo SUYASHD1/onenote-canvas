@@ -23,6 +23,7 @@ class OneNoteApp {
     this.imageModule = new ImageModule(this);
     this.flowEngine = new ElementFlowEngine(this);
     this.keyboardController = new KeyboardController(this);
+    this.history = new HistoryManager(this);
 
     // 2. Connect Canvas Callbacks
     this.canvas.onCanvasDoubleClicked = (x, y) => {
@@ -36,16 +37,22 @@ class OneNoteApp {
     // 3. Connect Ribbon Toolbar
     this.bindRibbonControls();
 
-    // 4. Seed Rich Starter Notes
-    this.seedStarterNotes();
+    // 4. Seed Rich Starter Notes or Restore
+    if (!this.history.loadFromStorage()) {
+      this.seedStarterNotes();
+    }
+    this.history.pushState('initial');
   }
 
-  createNoteBox(x = 100, y = 100, width = 360, height = null) {
+  createNoteBox(x = 100, y = 100, width = 360, height = null, recordHistory = true) {
     const id = this.boxIdCounter++;
     const box = new NoteBox(this, id, x, y, width, height);
     this.noteBoxes.push(box);
     this.selectNoteBox(box);
     this.canvas.ensureBounds(this.noteBoxes);
+    if (recordHistory && this.history) {
+      this.history.pushState('create_box');
+    }
     return box;
   }
 
@@ -57,6 +64,9 @@ class OneNoteApp {
     this.noteBoxes = this.noteBoxes.filter(b => String(b.id) !== String(id));
     if (this.selectedNoteBox && String(this.selectedNoteBox.id) === String(id)) {
       this.selectedNoteBox = null;
+    }
+    if (this.history) {
+      this.history.pushState('remove_box');
     }
   }
 
@@ -141,9 +151,10 @@ class OneNoteApp {
     bindFormat('btn-bold', 'bold');
     bindFormat('btn-italic', 'italic');
     bindFormat('btn-underline', 'underline');
-    bindFormat('btn-bullet-list', 'insertUnorderedList');
-    bindFormat('btn-undo', 'undo');
-    bindFormat('btn-redo', 'redo');
+    const btnUndo = document.getElementById('btn-undo');
+    if (btnUndo) btnUndo.onclick = () => this.history.undo();
+    const btnRedo = document.getElementById('btn-redo');
+    if (btnRedo) btnRedo.onclick = () => this.history.redo();
 
     // To-do Checkbox button
     const btnTodo = document.getElementById('btn-todo');

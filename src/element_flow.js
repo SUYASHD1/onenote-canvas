@@ -256,6 +256,9 @@ class ElementFlowEngine {
         if (sourceBox && sourceBox.element !== targetBoxEl) {
           sourceBox.checkIfEmpty();
         }
+        if (this.app.history) {
+          this.app.history.pushState('merge_item');
+        }
         return;
       }
     }
@@ -270,6 +273,9 @@ class ElementFlowEngine {
 
     if (sourceBox) {
       sourceBox.checkIfEmpty();
+    }
+    if (this.app.history) {
+      this.app.history.pushState('pop_out_item');
     }
   }
 }

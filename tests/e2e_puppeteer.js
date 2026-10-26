@@ -193,6 +193,33 @@ async function runTests() {
     });
     assert(itemDeleteTest, 'Pressing Delete on a selected image or table cleanly deletes only that item');
 
+    // TEST 10: Unified Undo & Redo (Ctrl+Z and Ctrl+R / Ctrl+Y)
+    console.log('\n--- 10. Unified Undo & Redo (Ctrl+Z, Ctrl+R, Ctrl+Y) ---');
+    const undoRedoTest = await page.evaluate(() => {
+      const countBeforeCreate = window.app.noteBoxes.length;
+
+      // 1. Create a new note box
+      window.app.createNoteBox(900, 900);
+      const countAfterCreate = window.app.noteBoxes.length;
+
+      // 2. Undo via Ctrl+Z
+      const undoEvt = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true });
+      window.dispatchEvent(undoEvt);
+      const countAfterUndo = window.app.noteBoxes.length;
+
+      // 3. Redo via Ctrl+R
+      const redoEvt = new KeyboardEvent('keydown', { key: 'r', ctrlKey: true, bubbles: true });
+      window.dispatchEvent(redoEvt);
+      const countAfterRedo = window.app.noteBoxes.length;
+
+      return (
+        countAfterCreate === countBeforeCreate + 1 &&
+        countAfterUndo === countBeforeCreate &&
+        countAfterRedo === countBeforeCreate + 1
+      );
+    });
+    assert(undoRedoTest, 'Ctrl+Z smoothly undoes canvas action; Ctrl+R smoothly redoes action without reloading page');
+
     console.log(`\n========================================`);
     console.log(`📊 Test Results: ${passedCount}/${totalCount} Passed (${Math.round((passedCount / totalCount) * 100)}%)`);
     console.log(`========================================\n`);

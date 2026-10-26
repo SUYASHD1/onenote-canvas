@@ -231,6 +231,9 @@ class ImageModule {
     }
 
     this.closeCropModal();
+    if (this.app.history) {
+      this.app.history.pushState('crop_image');
+    }
   }
 
   /**

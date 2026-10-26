@@ -99,6 +99,12 @@ class NoteBox {
       this.app.selectNoteBox(this, false); // select without border outline to type freely
     });
 
+    content.addEventListener('input', () => {
+      if (this.app.history) {
+        this.app.history.debouncePush('edit_text');
+      }
+    });
+
     // Content typing watcher for keyboard triggers (Tab table detection)
     content.addEventListener('keydown', (e) => {
       const selection = window.getSelection();
@@ -223,7 +229,12 @@ class NoteBox {
       };
 
       const onMouseUp = () => {
-        isDragging = false;
+        if (isDragging) {
+          isDragging = false;
+          if (this.app.history) {
+            this.app.history.pushState('move_box');
+          }
+        }
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
       };
@@ -299,6 +310,9 @@ class NoteBox {
         };
 
         const onMouseUp = () => {
+          if (this.app.history) {
+            this.app.history.pushState('resize_box');
+          }
           window.removeEventListener('mousemove', onMouseMove);
           window.removeEventListener('mouseup', onMouseUp);
         };

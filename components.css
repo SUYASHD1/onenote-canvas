@@ -151,6 +151,14 @@
   max-width: 100%;
   height: auto;
   user-select: none;
+  -webkit-user-drag: none;
+  cursor: grab;
+  border-radius: 2px;
+}
+
+.image-card.active-selected .image-container img {
+  outline: 2px solid var(--primary-purple);
+  outline-offset: 1px;
 }
 
 .image-tools-bar {
@@ -158,13 +166,18 @@
   top: 6px;
   right: 6px;
   display: none;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 4px;
   padding: 3px 6px;
   gap: 4px;
+  z-index: 50;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-.image-card:hover .image-tools-bar {
+.image-card:hover .image-tools-bar,
+.image-card.active-selected .image-tools-bar,
+.image-card:focus-within .image-tools-bar {
   display: flex;
 }
 

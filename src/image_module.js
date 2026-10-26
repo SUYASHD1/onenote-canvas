@@ -43,6 +43,34 @@ class ImageModule {
     img.src = imageSrc;
     img.dataset.originalSrc = imageSrc;
     img.style.width = '320px'; // default start width
+    img.draggable = false;
+    img.addEventListener('dragstart', (e) => e.preventDefault());
+
+    // Clicking image selects card to keep tools permanently visible
+    img.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.image-card').forEach(c => c.classList.remove('active-selected'));
+      card.classList.add('active-selected');
+    });
+
+    // Dragging by grabbing the image itself moves the ENTIRE block (image + caption + tools)
+    img.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      document.querySelectorAll('.image-card').forEach(c => c.classList.remove('active-selected'));
+      card.classList.add('active-selected');
+
+      const parentBoxEl = block.closest('.note-box');
+      const parentBox = parentBoxEl ? this.app.findNoteBox(parentBoxEl.dataset.boxId) : null;
+      if (parentBox) {
+        this.app.flowEngine.pendingDrag = {
+          blockEl: block,
+          noteBox: parentBox,
+          startX: e.clientX,
+          startY: e.clientY
+        };
+      }
+    });
 
     // Floating Tools Bar (Crop, Delete)
     const tools = document.createElement('div');

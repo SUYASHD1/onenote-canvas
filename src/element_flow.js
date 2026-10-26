@@ -7,6 +7,7 @@
  * - Pop-Out (Detach): dragging outside note box bounds detaches item into a fresh note box.
  * - Pop-In (Merge): dragging over another note box displays the glowing blue guideline
  *   and inserts the element between paragraphs on drop.
+ * - Robust cleanup: Prevents sticky or orphaned drag ghost elements on screen.
  */
 
 class ElementFlowEngine {
@@ -16,8 +17,10 @@ class ElementFlowEngine {
     this.activeDragElement = null;
     this.dragSourceBox = null;
     this.isDragging = false;
+    this.pendingDrag = null;
+    this.dragThreshold = 5; // pixels before drag starts
+    this.ghost = null;
     this.targetBox = null;
-    this.insertIndex = -1;
     this.targetAfterBlock = null;
 
     this.initGlobalEvents();
@@ -33,46 +36,29 @@ class ElementFlowEngine {
     grip.addEventListener('mousedown', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      this.startBlockDrag(blockEl, parentNoteBox, e);
+      
+      // Store pending drag; do NOT spawn ghost immediately on mousedown
+      this.pendingDrag = {
+        blockEl,
+        noteBox: parentNoteBox,
+        startX: e.clientX,
+        startY: e.clientY
+      };
     });
-  }
-
-  /**
-   * Start dragging a block via its left-margin grip
-   */
-  startBlockDrag(blockEl, noteBox, e) {
-    this.isDragging = true;
-    this.activeDragElement = blockEl;
-    this.dragSourceBox = noteBox;
-    blockEl.classList.add('is-dragging-origin');
-
-    // Create a visual drag ghost that follows the cursor
-    const ghost = blockEl.cloneNode(true);
-    ghost.id = 'drag-ghost';
-    ghost.style.position = 'fixed';
-    ghost.style.zIndex = '99999';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.opacity = '0.75';
-    ghost.style.transform = 'scale(0.95)';
-    ghost.style.width = `${blockEl.offsetWidth}px`;
-    ghost.style.background = '#ffffff';
-    ghost.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)';
-    ghost.style.border = '1px solid #7719aa';
-    document.body.appendChild(ghost);
-    this.ghost = ghost;
-
-    this.updateGhostPosition(e.clientX, e.clientY);
-  }
-
-  updateGhostPosition(clientX, clientY) {
-    if (this.ghost) {
-      this.ghost.style.left = `${clientX + 10}px`;
-      this.ghost.style.top = `${clientY + 10}px`;
-    }
   }
 
   initGlobalEvents() {
     window.addEventListener('mousemove', (e) => {
+      // 1. Check if pending drag crosses threshold
+      if (this.pendingDrag && !this.isDragging) {
+        const dx = Math.abs(e.clientX - this.pendingDrag.startX);
+        const dy = Math.abs(e.clientY - this.pendingDrag.startY);
+        if (dx > this.dragThreshold || dy > this.dragThreshold) {
+          this.startBlockDrag(this.pendingDrag.blockEl, this.pendingDrag.noteBox, e);
+          this.pendingDrag = null;
+        }
+      }
+
       if (!this.isDragging || !this.activeDragElement) return;
 
       this.updateGhostPosition(e.clientX, e.clientY);
@@ -88,14 +74,82 @@ class ElementFlowEngine {
       }
     });
 
+    // Mouseup triggers drop
     window.addEventListener('mouseup', (e) => {
-      if (!this.isDragging) return;
-      this.finalizeDrop(e);
+      if (this.pendingDrag) {
+        this.pendingDrag = null;
+      }
+      if (this.isDragging) {
+        this.finalizeDrop(e);
+      } else {
+        this.cleanAllGhosts();
+      }
     });
+
+    // Safety net: cancel drag if window loses focus
+    window.addEventListener('blur', () => this.cancelDrag());
   }
 
   /**
-   * Hovering over a note box: calculate the nearest paragraph gap and show blue guideline
+   * Start dragging a block via its left-margin grip
+   */
+  startBlockDrag(blockEl, noteBox, e) {
+    this.cleanAllGhosts();
+    this.isDragging = true;
+    this.activeDragElement = blockEl;
+    this.dragSourceBox = noteBox;
+    blockEl.classList.add('is-dragging-origin');
+
+    // Create a compact, clean visual drag indicator that follows cursor
+    const ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    ghost.style.position = 'fixed';
+    ghost.style.zIndex = '99999';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.padding = '6px 12px';
+    ghost.style.borderRadius = '4px';
+    ghost.style.background = '#7719aa';
+    ghost.style.color = '#ffffff';
+    ghost.style.fontSize = '12px';
+    ghost.style.fontWeight = '600';
+    ghost.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
+    ghost.innerHTML = `::: Moving ${blockEl.dataset.blockType || 'item'}`;
+    
+    document.body.appendChild(ghost);
+    this.ghost = ghost;
+
+    this.updateGhostPosition(e.clientX, e.clientY);
+  }
+
+  updateGhostPosition(clientX, clientY) {
+    if (this.ghost) {
+      this.ghost.style.left = `${clientX + 14}px`;
+      this.ghost.style.top = `${clientY + 14}px`;
+    }
+  }
+
+  cleanAllGhosts() {
+    document.querySelectorAll('.drag-ghost').forEach(el => el.remove());
+    if (this.ghost) {
+      this.ghost.remove();
+      this.ghost = null;
+    }
+  }
+
+  cancelDrag() {
+    this.cleanAllGhosts();
+    if (this.activeDragElement) {
+      this.activeDragElement.classList.remove('is-dragging-origin');
+    }
+    this.hideGuideline();
+    this.isDragging = false;
+    this.pendingDrag = null;
+    this.activeDragElement = null;
+    this.dragSourceBox = null;
+  }
+
+  /**
+   * Hovering over a note box: calculate nearest paragraph gap and show radiant blue guideline
    */
   handleHoverOverNoteBox(noteBoxEl, clientX, clientY) {
     this.targetBox = noteBoxEl;
@@ -106,7 +160,7 @@ class ElementFlowEngine {
       .filter(b => b !== this.activeDragElement);
 
     let closestBlock = null;
-    let insertPosition = 'after'; // 'before' or 'after'
+    let insertPosition = 'after';
     let bestDist = Infinity;
 
     blocks.forEach(block => {
@@ -121,7 +175,6 @@ class ElementFlowEngine {
       }
     });
 
-    // Position the Radiant Blue Drop Guideline
     if (closestBlock) {
       this.targetAfterBlock = insertPosition === 'after' ? closestBlock : closestBlock.previousElementSibling;
       const bRect = closestBlock.getBoundingClientRect();
@@ -134,7 +187,6 @@ class ElementFlowEngine {
 
       this.showGuideline(stageX, stageY, bRect.width / zoom);
     } else {
-      // Empty container or hovering at top
       this.targetAfterBlock = null;
       const cRect = contentArea.getBoundingClientRect();
       const stageRect = this.app.canvas.stage.getBoundingClientRect();
@@ -165,10 +217,7 @@ class ElementFlowEngine {
    * Finalize the drag & drop: Pop-In (Merge) or Pop-Out (Detach to new Note Box)
    */
   finalizeDrop(e) {
-    if (this.ghost) {
-      this.ghost.remove();
-      this.ghost = null;
-    }
+    this.cleanAllGhosts();
 
     if (this.activeDragElement) {
       this.activeDragElement.classList.remove('is-dragging-origin');
@@ -181,6 +230,7 @@ class ElementFlowEngine {
 
     this.hideGuideline();
     this.isDragging = false;
+    this.pendingDrag = null;
     this.activeDragElement = null;
     this.dragSourceBox = null;
 
@@ -198,13 +248,11 @@ class ElementFlowEngine {
           targetContent.appendChild(draggedElement);
         }
 
-        // Reattach hover grip listener to the target box
         const targetBoxInstance = this.app.findNoteBox(targetBoxEl.dataset.boxId);
         if (targetBoxInstance) {
           this.attachGripDrag(draggedElement, targetBoxInstance);
         }
 
-        // Check if source box became completely empty, clean up if needed
         if (sourceBox && sourceBox.element !== targetBoxEl) {
           sourceBox.checkIfEmpty();
         }
@@ -212,16 +260,14 @@ class ElementFlowEngine {
       }
     }
 
-    // SCENARIO 2: Pop-Out (Detach into a brand new standalone Note Box)
+    // SCENARIO 2: Dropped outside on empty canvas -> Pop Out to new Note Box
     const dropCoords = this.app.canvas.clientToCanvas(e.clientX, e.clientY);
     const newBox = this.app.createNoteBox(dropCoords.x - 20, dropCoords.y - 20, Math.max(280, draggedElement.offsetWidth + 40));
     
-    // Clear default empty paragraph in new box and insert detached item
     newBox.contentArea.innerHTML = '';
     newBox.contentArea.appendChild(draggedElement);
     this.attachGripDrag(draggedElement, newBox);
 
-    // Clean up source box
     if (sourceBox) {
       sourceBox.checkIfEmpty();
     }

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneNote Spatial Canvas — Infinite Note Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="components.css">
+</head>
+<body>
+  <!-- Top Application Header & Ribbon -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect width="24" height="24" rx="4" fill="#7719AA"/>
+          <path d="M7 6H10.5L14 13.5V6H17V18H13.5L10 10.5V18H7V6Z" fill="white"/>
+        </svg>
+      </div>
+      <div class="brand-title">
+        <span class="notebook-name">Personal Workspace</span>
+        <span class="page-title" id="page-title-display">Project Canvas</span>
+      </div>
+    </div>
+
+    <!-- OneNote Top Ribbon Bar -->
+    <nav class="ribbon-bar" aria-label="Editor Ribbon">
+      <!-- Section: File & History -->
+      <div class="ribbon-group">
+        <button class="ribbon-btn" id="btn-undo" title="Undo (Ctrl+Z)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6M3 13C5 7 11 4 17 6c4 1.5 6 6 4 10-2 4-6 6-10 6-3 0-6-1.5-8-4"/></svg>
+        </button>
+        <button class="ribbon-btn" id="btn-redo" title="Redo (Ctrl+Y)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6M21 13c-2-6-8-9-14-7-4 1.5-6 6-4 10 2 4 6 6 10 6 3 0 6-1.5 8-4"/></svg>
+        </button>
+      </div>
+      <div class="ribbon-divider"></div>
+
+      <!-- Section: Insert Elements -->
+      <div class="ribbon-group">
+        <button class="ribbon-btn primary" id="btn-new-note" title="Add Note Container (Double-Click anywhere)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <span>New Note</span>
+        </button>
+        <button class="ribbon-btn" id="btn-insert-table" title="Insert Table (or press Tab after word)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+          <span>Table</span>
+        </button>
+        <button class="ribbon-btn" id="btn-insert-image" title="Insert Image">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span>Picture</span>
+        </button>
+        <input type="file" id="image-file-input" accept="image/*" style="display:none;">
+      </div>
+      <div class="ribbon-divider"></div>
+
+      <!-- Section: Text Formatting -->
+      <div class="ribbon-group">
+        <button class="ribbon-btn icon-only" id="btn-bold" title="Bold (Ctrl+B)">
+          <strong>B</strong>
+        </button>
+        <button class="ribbon-btn icon-only" id="btn-italic" title="Italic (Ctrl+I)">
+          <em>I</em>
+        </button>
+        <button class="ribbon-btn icon-only" id="btn-underline" title="Underline (Ctrl+U)">
+          <u>U</u>
+        </button>
+        <button class="ribbon-btn icon-only" id="btn-bullet-list" title="Bullet List">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.5" fill="currentColor"/><circle cx="3.5" cy="12" r="1.5" fill="currentColor"/><circle cx="3.5" cy="18" r="1.5" fill="currentColor"/></svg>
+        </button>
+        <button class="ribbon-btn icon-only" id="btn-todo" title="To-do Checkbox">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </button>
+      </div>
+      <div class="ribbon-divider"></div>
+
+      <!-- Section: View & Zoom -->
+      <div class="ribbon-group">
+        <button class="ribbon-btn icon-only" id="btn-zoom-out" title="Zoom Out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </button>
+        <span class="zoom-level-text" id="zoom-display">100%</span>
+        <button class="ribbon-btn icon-only" id="btn-zoom-in" title="Zoom In">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </button>
+        <button class="ribbon-btn" id="btn-toggle-grid" title="Toggle Grid Lines">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+          <span>Grid</span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Infinite Viewport with Fixed Top-Left Origin -->
+  <main class="canvas-viewport" id="canvas-viewport" tabindex="0">
+    <!-- The Actual Drawing Surface that Expands Automatically Down & Right -->
+    <div class="canvas-stage show-grid" id="canvas-stage">
+      <!-- Live Drop / Insertion Guideline Marker (Radiant Blue Line) -->
+      <div class="drop-guideline" id="drop-guideline">
+        <div class="guideline-dot left"></div>
+        <div class="guideline-line"></div>
+        <div class="guideline-dot right"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Status Bar -->
+  <footer class="app-statusbar">
+    <div class="status-left">
+      <span class="status-indicator"></span>
+      <span id="status-hint">Double-click blank space to add a note box • Drag [:::] grip to rearrange or detach</span>
+    </div>
+    <div class="status-right">
+      <span id="canvas-dimensions">Page Bounds: 3200 × 2400 px</span>
+      <span class="status-sep">|</span>
+      <span>Microsoft OneNote Mode</span>
+    </div>
+  </footer>
+
+  <!-- Built-In Image Crop Modal Dialog -->
+  <div class="crop-modal" id="crop-modal" style="display:none;" aria-hidden="true">
+    <div class="crop-dialog">
+      <div class="crop-dialog-header">
+        <h3>Crop Image</h3>
+        <button class="crop-dialog-close" id="btn-crop-cancel" title="Cancel Crop">×</button>
+      </div>
+      <div class="crop-dialog-body">
+        <div class="crop-stage-container" id="crop-stage-container">
+          <img id="crop-target-img" src="" alt="Cropping target">
+          <div class="crop-box" id="crop-box">
+            <div class="crop-handle n" data-handle="n"></div>
+            <div class="crop-handle s" data-handle="s"></div>
+            <div class="crop-handle e" data-handle="e"></div>
+            <div class="crop-handle w" data-handle="w"></div>
+            <div class="crop-handle nw" data-handle="nw"></div>
+            <div class="crop-handle ne" data-handle="ne"></div>
+            <div class="crop-handle sw" data-handle="sw"></div>
+            <div class="crop-handle se" data-handle="se"></div>
+          </div>
+        </div>
+      </div>
+      <div class="crop-dialog-footer">
+        <button class="ribbon-btn" id="btn-crop-reset">Reset Crop</button>
+        <button class="ribbon-btn primary" id="btn-crop-apply">Apply Crop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modular Scripts -->
+  <script src="src/canvas.js"></script>
+  <script src="src/table_module.js"></script>
+  <script src="src/image_module.js"></script>
+  <script src="src/element_flow.js"></script>
+  <script src="src/note_box.js"></script>
+  <script src="src/keyboard_shortcuts.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+/* ==========================================================================
+   OneNote Spatial Canvas — Component Themes & Layouts
+   ========================================================================== */
+
+/* ==========================================================================
+   Table Module & 4 Layout Formats
+   ========================================================================== */
+
+.table-wrapper {
+  margin: 6px 0;
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: #f3f2f1;
+  border: 1px solid #d1d1d1;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  font-size: 11px;
+}
+
+.table-layout-select {
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: white;
+  cursor: pointer;
+}
+
+.table-tool-btn {
+  padding: 2px 6px;
+  font-size: 11px;
+  background: #ffffff;
+  border: 1px solid #cccccc;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.table-tool-btn:hover {
+  background: #eaeaea;
+}
+
+.table-tool-btn.danger:hover {
+  color: #d83b01;
+  border-color: #d83b01;
+}
+
+.canvas-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  background: #ffffff;
+  width: 100%;
+}
+
+.canvas-table td, 
+.canvas-table th {
+  padding: 6px 10px;
+  min-width: 60px;
+  outline: none;
+}
+
+/* Layout 1: Classic Grid */
+.canvas-table.layout-classic-grid {
+  border: 1px solid #bbbbbb;
+}
+.canvas-table.layout-classic-grid th,
+.canvas-table.layout-classic-grid td {
+  border: 1px solid #d1d1d1;
+}
+.canvas-table.layout-classic-grid th {
+  background: #f3f2f1;
+  font-weight: 600;
+}
+
+/* Layout 2: Zebra Banded Rows */
+.canvas-table.layout-zebra-banded {
+  border: 1px solid #cccccc;
+}
+.canvas-table.layout-zebra-banded th {
+  background: #e1dfdd;
+  border-bottom: 2px solid #8a8886;
+  font-weight: 600;
+}
+.canvas-table.layout-zebra-banded td {
+  border: 1px solid #e1dfdd;
+}
+.canvas-table.layout-zebra-banded tr:nth-child(even) td {
+  background-color: #f8f8f9;
+}
+
+/* Layout 3: Modern Header Accent */
+.canvas-table.layout-modern-accent {
+  border: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.canvas-table.layout-modern-accent th {
+  background: var(--primary-purple);
+  color: #ffffff;
+  font-weight: 600;
+  border: none;
+}
+.canvas-table.layout-modern-accent td {
+  border-bottom: 1px solid #edebe9;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+/* Layout 4: Compact Matrix */
+.canvas-table.layout-compact-matrix {
+  border: 1px solid #333333;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.canvas-table.layout-compact-matrix th,
+.canvas-table.layout-compact-matrix td {
+  border: 1px solid #999999;
+  padding: 4px 6px;
+}
+.canvas-table.layout-compact-matrix th {
+  background: #333333;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Image Card & Crop Module
+   ========================================================================== */
+
+.image-card {
+  display: inline-block;
+  position: relative;
+  margin: 6px 0;
+  max-width: 100%;
+}
+
+.image-container {
+  position: relative;
+  display: inline-block;
+}
+
+.image-container img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  user-select: none;
+}
+
+.image-tools-bar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 3px;
+  padding: 3px 6px;
+  gap: 4px;
+}
+
+.image-card:hover .image-tools-bar {
+  display: flex;
+}
+
+.image-tool-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.image-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.image-caption {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 2px;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+}
+
+.image-caption:focus {
+  border-bottom-color: var(--primary-purple);
+}
+
+/* Crop Modal */
+.crop-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.crop-dialog {
+  background: #ffffff;
+  border-radius: 6px;
+  width: 90vw;
+  max-width: 750px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.crop-dialog-header {
+  padding: 12px 18px;
+  border-bottom: 1px solid #e1dfdd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.crop-dialog-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.crop-dialog-body {
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  background: #222222;
+}
+
+.crop-stage-container {
+  position: relative;
+  display: inline-block;
+}
+
+.crop-stage-container img {
+  display: block;
+  max-width: 100%;
+  max-height: 55vh;
+  user-select: none;
+}
+
+.crop-box {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 80%;
+  height: 80%;
+  border: 2px dashed #ffffff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  cursor: move;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border: 1px solid #333333;
+}
+
+.crop-handle.n { top: -5px; left: calc(50% - 5px); cursor: ns-resize; }
+.crop-handle.s { bottom: -5px; left: calc(50% - 5px); cursor: ns-resize; }
+.crop-handle.e { right: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+.crop-handle.w { left: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+.crop-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.crop-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.crop-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.crop-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+.crop-dialog-footer {
+  padding: 12px 18px;
+  border-top: 1px solid #e1dfdd;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   Status Bar
+   ========================================================================== */
+
+.app-statusbar {
+  height: 26px;
+  background: #faf9f8;
+  border-top: 1px solid #edebe9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.status-left, .status-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #107c41;
+}
+
+.status-sep {
+  color: #ccc;
+}

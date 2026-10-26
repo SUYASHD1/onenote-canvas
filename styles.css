@@ -1,0 +1,366 @@
+/* ==========================================================================
+   OneNote Spatial Canvas — Modern Utilitarian Styling System
+   ========================================================================== */
+
+:root {
+  --primary-purple: #7719aa;
+  --primary-purple-hover: #5d1286;
+  --primary-purple-light: #f5eefc;
+  --onenote-header-gray: #e6e6e6;
+  --onenote-border-gray: #cccccc;
+  --onenote-active-border: #7719aa;
+  --bg-page: #ffffff;
+  --bg-canvas-grid: #f9f9fb;
+  --grid-line-color: rgba(0, 0, 0, 0.04);
+  --text-main: #242424;
+  --text-muted: #666666;
+  --guideline-blue: #0078d4;
+  --card-bg: #ffffff;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--text-main);
+  background-color: #f3f2f1;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+/* ==========================================================================
+   Top Application Header & Ribbon
+   ========================================================================== */
+
+.app-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e1dfdd;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #faf9f8;
+  border-bottom: 1px solid #edebe9;
+}
+
+.brand-icon {
+  display: flex;
+  align-items: center;
+}
+
+.brand-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.notebook-name {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.page-title {
+  font-size: 15px;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.ribbon-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: #ffffff;
+}
+
+.ribbon-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ribbon-divider {
+  width: 1px;
+  height: 22px;
+  background-color: #edebe9;
+  margin: 0 6px;
+}
+
+.ribbon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ribbon-btn:hover {
+  background: #f3f2f1;
+  border-color: #e1dfdd;
+}
+
+.ribbon-btn.primary {
+  background: var(--primary-purple);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.ribbon-btn.primary:hover {
+  background: var(--primary-purple-hover);
+}
+
+.ribbon-btn.icon-only {
+  padding: 5px 8px;
+}
+
+.zoom-level-text {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 42px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Canvas Viewport & Elastic Stage
+   ========================================================================== */
+
+.canvas-viewport {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  background-color: #f4f5f7;
+  outline: none;
+}
+
+.canvas-stage {
+  position: relative;
+  background-color: var(--bg-page);
+  min-width: 3200px;
+  min-height: 2400px;
+  transform-origin: 0 0;
+  transition: width 0.1s ease, height 0.1s ease;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.canvas-stage.show-grid {
+  background-image: 
+    linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ==========================================================================
+   Universal Note Container
+   ========================================================================== */
+
+.note-box {
+  position: absolute;
+  min-width: 200px;
+  min-height: 80px;
+  background: var(--card-bg);
+  border: 1px solid transparent;
+  border-radius: 2px;
+  box-shadow: var(--card-shadow);
+  user-select: text;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-box:hover {
+  border-color: #d1d1d1;
+}
+
+.note-box.selected {
+  border-color: var(--onenote-active-border);
+  box-shadow: 0 0 0 1px var(--onenote-active-border);
+}
+
+/* Note Header Bar */
+.note-header {
+  height: 20px;
+  background: var(--onenote-header-gray);
+  border-bottom: 1px solid #dcdcdc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  cursor: move;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  user-select: none;
+}
+
+.note-box:hover .note-header,
+.note-box.selected .note-header {
+  opacity: 1;
+}
+
+.note-move-handle {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #666666;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: grab;
+}
+
+.note-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  color: #666666;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.note-close-btn:hover {
+  color: #d83b01;
+}
+
+/* Note Content Area */
+.note-content {
+  flex: 1;
+  padding: 8px 12px 12px 28px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-main);
+  position: relative;
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   Blocks, Hover Grips (:::) and Detach/Merge
+   ========================================================================== */
+
+.canvas-block {
+  position: relative;
+  margin: 4px 0;
+  padding: 2px 0;
+}
+
+.canvas-block:hover .block-grip {
+  opacity: 1;
+}
+
+.block-grip {
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888888;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease;
+  user-select: none;
+  font-size: 11px;
+}
+
+.block-grip:hover {
+  color: var(--primary-purple);
+}
+
+.canvas-block.todo-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.todo-checkbox {
+  cursor: pointer;
+  accent-color: var(--primary-purple);
+}
+
+/* ==========================================================================
+   Live Blue Drop Guideline
+   ========================================================================== */
+
+.drop-guideline {
+  position: absolute;
+  display: none;
+  height: 4px;
+  pointer-events: none;
+  z-index: 9999;
+  align-items: center;
+}
+
+.drop-guideline.active {
+  display: flex;
+}
+
+.guideline-line {
+  flex: 1;
+  height: 2px;
+  background: var(--guideline-blue);
+  box-shadow: 0 0 6px rgba(0, 120, 212, 0.6);
+}
+
+.guideline-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--guideline-blue);
+  box-shadow: 0 0 4px rgba(0, 120, 212, 0.8);
+}
+
+/* ==========================================================================
+   8-Point Resize Handles
+   ========================================================================== */
+
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border: 1px solid var(--onenote-active-border);
+  display: none;
+  z-index: 10;
+}
+
+.note-box.selected .resize-handle {
+  display: block;
+}
+
+.resize-handle.nw { top: -4px; left: -4px; cursor: nwse-resize; }
+.resize-handle.n  { top: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+.resize-handle.ne { top: -4px; right: -4px; cursor: nesw-resize; }
+.resize-handle.e  { top: calc(50% - 4px); right: -4px; cursor: ew-resize; }
+.resize-handle.se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+.resize-handle.s  { bottom: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+.resize-handle.sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.resize-handle.w  { top: calc(50% - 4px); left: -4px; cursor: ew-resize; }
+

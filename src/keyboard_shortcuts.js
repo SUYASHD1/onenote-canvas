@@ -34,6 +34,7 @@ class KeyboardController {
     });
 
     window.addEventListener('keydown', (e) => this.handleGlobalKeyDown(e));
+    window.addEventListener('paste', (e) => this.handleGlobalPaste(e));
   }
 
   /**
@@ -116,40 +117,62 @@ class KeyboardController {
     }
 
     // =========================================================================
+    // =========================================================================
     // 4. Universal Copy: Ctrl + C
     // =========================================================================
     if (isModifierKey && (e.key === 'c' || e.key === 'C')) {
       const hasTextSelection = window.getSelection()?.toString()?.length > 0;
+      if (hasTextSelection) {
+        return; // Allow native text copy
+      }
 
-      // Tier 2: Item Selected (Image or Table)
-      if (selectedItem && !hasTextSelection) {
+      // 1. Image Selected
+      const selectedImg = document.querySelector('.image-card.active-selected');
+      if (selectedImg) {
         e.preventDefault();
-        const block = selectedItem.closest('.canvas-block');
-        if (block) {
-          this.internalClipboard = {
-            type: 'item',
-            html: block.outerHTML
-          };
-        }
+        const img = selectedImg.querySelector('img');
+        const caption = selectedImg.querySelector('.image-caption')?.innerText;
+        this.internalClipboard = {
+          type: 'image',
+          src: img?.src,
+          caption: caption || ''
+        };
+        try { navigator.clipboard?.writeText?.(caption || '[Image]'); } catch (_) {}
         return;
       }
 
-      // Tier 3: Container Selected
-      if (selectedBox && selectedBox.isSelected && !hasTextSelection) {
+      // 2. Table Selected
+      const selectedTable = document.querySelector('.table-wrapper.active-selected') || document.activeElement?.closest?.('.table-wrapper');
+      if (selectedTable) {
         e.preventDefault();
+        const table = selectedTable.querySelector('table');
+        const rows = Array.from(table.rows).map(r => Array.from(r.cells).map(c => c.innerText.trim()));
+        const layout = Array.from(table.classList).find(c => c.startsWith('layout-')) || 'layout-classic-grid';
         this.internalClipboard = {
-          type: 'note-box',
-          width: selectedBox.width,
-          html: selectedBox.contentArea.innerHTML
+          type: 'table',
+          data: rows,
+          layout: layout
         };
         try {
-          navigator.clipboard?.writeText?.(selectedBox.contentArea.innerText);
+          const tsv = rows.map(r => r.join('\t')).join('\n');
+          navigator.clipboard?.writeText?.(tsv);
         } catch (_) {}
         return;
       }
 
-      // Tier 1: Text highlighted -> allow native browser copy
-      return;
+      // 3. Container Selected
+      if (selectedBox && selectedBox.isSelected) {
+        e.preventDefault();
+        const summary = selectedBox.contentArea.innerText;
+        this.internalClipboard = {
+          type: 'note-box',
+          width: selectedBox.width,
+          html: selectedBox.contentArea.innerHTML,
+          summaryText: summary
+        };
+        try { navigator.clipboard?.writeText?.(summary); } catch (_) {}
+        return;
+      }
     }
 
     // =========================================================================
@@ -157,108 +180,99 @@ class KeyboardController {
     // =========================================================================
     if (isModifierKey && (e.key === 'x' || e.key === 'X')) {
       const hasTextSelection = window.getSelection()?.toString()?.length > 0;
+      if (hasTextSelection) {
+        return; // Allow native text cut
+      }
 
-      // Tier 2: Item Selected
-      if (selectedItem && !hasTextSelection) {
+      const selectedImg = document.querySelector('.image-card.active-selected');
+      if (selectedImg) {
         e.preventDefault();
-        const block = selectedItem.closest('.canvas-block');
-        if (block) {
-          this.internalClipboard = {
-            type: 'item',
-            html: block.outerHTML
-          };
-          block.remove();
-        }
+        const img = selectedImg.querySelector('img');
+        const caption = selectedImg.querySelector('.image-caption')?.innerText;
+        this.internalClipboard = {
+          type: 'image',
+          src: img?.src,
+          caption: caption || ''
+        };
+        selectedImg.closest('.canvas-block')?.remove();
+        if (this.app.history) this.app.history.pushState('cut_image');
         return;
       }
 
-      // Tier 3: Container Selected
-      if (selectedBox && selectedBox.isSelected && !hasTextSelection) {
+      const selectedTable = document.querySelector('.table-wrapper.active-selected');
+      if (selectedTable) {
+        e.preventDefault();
+        const table = selectedTable.querySelector('table');
+        const rows = Array.from(table.rows).map(r => Array.from(r.cells).map(c => c.innerText.trim()));
+        const layout = Array.from(table.classList).find(c => c.startsWith('layout-')) || 'layout-classic-grid';
+        this.internalClipboard = {
+          type: 'table',
+          data: rows,
+          layout: layout
+        };
+        selectedTable.closest('.canvas-block')?.remove();
+        if (this.app.history) this.app.history.pushState('cut_table');
+        return;
+      }
+
+      if (selectedBox && selectedBox.isSelected) {
         e.preventDefault();
         this.internalClipboard = {
           type: 'note-box',
           width: selectedBox.width,
-          html: selectedBox.contentArea.innerHTML
+          html: selectedBox.contentArea.innerHTML,
+          summaryText: selectedBox.contentArea.innerText
         };
-        try {
-          navigator.clipboard?.writeText?.(selectedBox.contentArea.innerText);
-        } catch (_) {}
         selectedBox.destroy();
         this.app.selectedNoteBox = null;
+        if (this.app.history) this.app.history.pushState('cut_box');
         return;
       }
-
-      // Tier 1: Text highlighted -> allow native browser cut
-      return;
     }
 
     // =========================================================================
-    // 6. Universal Paste: Ctrl + V
+    // 6. Universal Paste Shortcut: Ctrl + V (Works on canvas & inside notes)
     // =========================================================================
     if (isModifierKey && (e.key === 'v' || e.key === 'V')) {
-      // Case A: Not actively typing text (pasting onto canvas or note header)
-      if (!isTyping) {
+      const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      if (!isInput && this.internalClipboard) {
         e.preventDefault();
-        if (this.internalClipboard) {
-          if (this.internalClipboard.type === 'note-box') {
-            this.pasteNoteBox(this.internalClipboard, this.mouseCanvasPos.x, this.mouseCanvasPos.y);
-            return;
-          } else if (this.internalClipboard.type === 'item') {
-            this.pasteItemToNewBox(this.internalClipboard.html, this.mouseCanvasPos.x, this.mouseCanvasPos.y);
-            return;
-          }
-        }
-
-        // Fallback: system clipboard text
-        navigator.clipboard?.readText?.().then(text => {
-          if (text) {
-            const newBox = this.app.createNoteBox(this.mouseCanvasPos.x, this.mouseCanvasPos.y);
-            newBox.contentArea.innerHTML = '';
-            newBox.addTextBlock(text);
-          }
-        }).catch(() => {});
+        this.pasteInternalClipboard();
         return;
       }
-
-      // Case B: Typing inside a note box
-      if (this.internalClipboard && this.internalClipboard.type === 'item') {
-        e.preventDefault();
-        this.pasteItemIntoActiveBox(this.internalClipboard.html);
-        return;
-      }
-
-      // Otherwise allow native text paste
-      return;
     }
 
     // =========================================================================
     // 7. Universal Delete: Delete Key
     // =========================================================================
     if (e.key === 'Delete') {
-      // Tier 2: Item Selected (Image or Table)
       if (selectedItem) {
         e.preventDefault();
         const block = selectedItem.closest('.canvas-block');
-        if (block) {
-          block.remove();
-        }
+        if (block) block.remove();
         return;
       }
 
-      // Tier 3: Container Header Selected
       if (selectedBox && selectedBox.isSelected && !isTyping) {
         e.preventDefault();
         selectedBox.destroy();
         this.app.selectedNoteBox = null;
         return;
       }
+    }
 
-      // Tier 1: Character deletion while typing (container is 100% immune)
+    // =========================================================================
+    // 8. Insert Math Equation: Alt + = (Standard OneNote Equation shortcut)
+    // =========================================================================
+    if (e.altKey && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      const btnMath = document.getElementById('btn-insert-math');
+      if (btnMath) btnMath.click();
       return;
     }
 
     // =========================================================================
-    // 8. Immune Backspace (Prevents accidental container destruction)
+    // 9. Immune Backspace (Prevents accidental container destruction)
     // =========================================================================
     if (e.key === 'Backspace' && isTyping) {
       const selection = window.getSelection();
@@ -281,6 +295,266 @@ class KeyboardController {
   }
 
   /**
+   * Helper: Find target table cell if active
+   */
+  getTargetCell() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const node = sel.getRangeAt(0).startContainer;
+      const cell = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement)?.closest('td, th');
+      if (cell) return cell;
+    }
+    const activeEl = document.activeElement;
+    if (activeEl && activeEl.closest('td, th')) {
+      return activeEl.closest('td, th');
+    }
+    if (this.app.tableModule && this.app.tableModule.lastFocusedCell) {
+      if (document.contains(this.app.tableModule.lastFocusedCell)) {
+        return this.app.tableModule.lastFocusedCell;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Universal Internal Clipboard Paste Router
+   */
+  pasteInternalClipboard() {
+    if (!this.internalClipboard) return;
+
+    const targetCell = this.getTargetCell();
+    if (targetCell) {
+      if (this.internalClipboard.type === 'image') {
+        this.app.tableModule.insertImageIntoCell(targetCell, this.internalClipboard.src);
+        return;
+      }
+      if (this.internalClipboard.type === 'table') {
+        targetCell.innerText = this.internalClipboard.data.map(r => r.join(' | ')).join('\n');
+        return;
+      }
+    }
+
+    // Target 2: Active Note Box
+    if (this.app.selectedNoteBox && !this.app.selectedNoteBox.isSelected) {
+      const box = this.app.selectedNoteBox;
+      if (this.internalClipboard.type === 'image') {
+        const block = this.app.imageModule.createImageBlock(this.internalClipboard.src, this.internalClipboard.caption);
+        box.contentArea.appendChild(block);
+        this.app.flowEngine.attachGripDrag(block, box);
+        if (this.app.history) this.app.history.pushState('paste_image');
+        return;
+      }
+      if (this.internalClipboard.type === 'table') {
+        const block = this.app.tableModule.createTableFromData(this.internalClipboard.data, this.internalClipboard.layout);
+        box.contentArea.appendChild(block);
+        this.app.flowEngine.attachGripDrag(block, box);
+        if (this.app.history) this.app.history.pushState('paste_table');
+        return;
+      }
+    }
+
+    // Target 3: Blank Canvas at mouse position
+    const posX = Math.round(this.mouseCanvasPos.x || 320);
+    const posY = Math.round(this.mouseCanvasPos.y || 220);
+
+    if (this.internalClipboard.type === 'image') {
+      const newBox = this.app.createNoteBox(posX, posY, 380);
+      newBox.contentArea.innerHTML = '';
+      const block = this.app.imageModule.createImageBlock(this.internalClipboard.src, this.internalClipboard.caption);
+      newBox.contentArea.appendChild(block);
+      this.app.flowEngine.attachGripDrag(block, newBox);
+      this.app.selectNoteBox(newBox);
+      if (this.app.history) this.app.history.pushState('paste_image');
+      return;
+    }
+
+    if (this.internalClipboard.type === 'table') {
+      const newBox = this.app.createNoteBox(posX, posY, 440);
+      newBox.contentArea.innerHTML = '';
+      const block = this.app.tableModule.createTableFromData(this.internalClipboard.data, this.internalClipboard.layout);
+      newBox.contentArea.appendChild(block);
+      this.app.flowEngine.attachGripDrag(block, newBox);
+      this.app.selectNoteBox(newBox);
+      if (this.app.history) this.app.history.pushState('paste_table');
+      return;
+    }
+
+    if (this.internalClipboard.type === 'note-box') {
+      const newBox = this.app.createNoteBox(posX, posY, this.internalClipboard.width || 360);
+      newBox.contentArea.innerHTML = this.internalClipboard.html;
+      this.rebindContainerElements(newBox);
+      this.app.selectNoteBox(newBox);
+      if (this.app.history) this.app.history.pushState('paste_box');
+      return;
+    }
+  }
+
+  /**
+   * Universal Native Clipboard Event Handler (external images, HTML tables, plain text)
+   */
+  handleGlobalPaste(e) {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    const targetCell = this.getTargetCell();
+    const activeEl = document.activeElement;
+    const isTyping = (activeEl && (activeEl.isContentEditable || activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA'));
+
+    // 1. External Image (Snipping tool screenshot, web image)
+    const items = clipboardData.items || [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target.result;
+            if (targetCell) {
+              this.app.tableModule.insertImageIntoCell(targetCell, dataUrl);
+            } else if (isTyping && this.app.selectedNoteBox) {
+              const imgBlock = this.app.imageModule.createImageBlock(dataUrl, null);
+              this.app.selectedNoteBox.contentArea.appendChild(imgBlock);
+              this.app.flowEngine.attachGripDrag(imgBlock, this.app.selectedNoteBox);
+            } else {
+              const newBox = this.app.createNoteBox(this.mouseCanvasPos.x, this.mouseCanvasPos.y, 380);
+              newBox.contentArea.innerHTML = '';
+              const imgBlock = this.app.imageModule.createImageBlock(dataUrl, null);
+              newBox.contentArea.appendChild(imgBlock);
+              this.app.flowEngine.attachGripDrag(imgBlock, newBox);
+            }
+            if (this.app.history) this.app.history.pushState('paste_image');
+          };
+          reader.readAsDataURL(file);
+          return;
+        }
+      }
+    }
+
+    const textData = clipboardData.getData('text/plain') || '';
+    const htmlData = clipboardData.getData('text/html') || '';
+
+    // 2. If internal clipboard has pending item, paste it directly
+    if (this.internalClipboard && (!textData || this.internalClipboard.summaryText === textData)) {
+      e.preventDefault();
+      this.pasteInternalClipboard();
+      return;
+    }
+
+    // 3. Sequential Universal Paste Pipeline (Preserves 100% natural reading order)
+    let units = null;
+    let pasteSourceType = 'rich';
+
+    const hasRichHTML = htmlData && (
+      htmlData.includes('<img') || htmlData.includes('<figure') || htmlData.includes('<table') || 
+      htmlData.includes('<a') || htmlData.includes('<sup') || htmlData.includes('class="reference"') ||
+      htmlData.includes('<h1') || htmlData.includes('<h2') || htmlData.includes('<h3') || 
+      htmlData.includes('<ul') || htmlData.includes('<ol') || htmlData.includes('<pre') || htmlData.includes('<blockquote')
+    );
+
+    // If htmlData is available and contains rich layout (from web or browser mouse copy of AI chats),
+    // htmlData preserves the authentic top-to-bottom sequence of headings, text, pictures, and tables!
+    if (hasRichHTML) {
+      if (targetCell) {
+        const doc = new DOMParser().parseFromString(htmlData, 'text/html');
+        const firstImg = doc.querySelector('img');
+        if (firstImg) {
+          let src = firstImg.getAttribute('src');
+          if (src && src.startsWith('//')) src = 'https:' + src;
+          if (src) {
+            e.preventDefault();
+            this.app.tableModule.insertImageIntoCell(targetCell, src);
+            if (this.app.history) this.app.history.pushState('paste_image');
+            return;
+          }
+        }
+      }
+
+      units = this.app.parseHTMLToOutlineUnits(htmlData);
+      pasteSourceType = 'web_html';
+    } else if (this.app.markdownModule && this.app.markdownModule.isMarkdown(textData)) {
+      // If htmlData is absent (e.g. user clicked ChatGPT/Claude "Copy" button which outputs raw Markdown),
+      // parse textData line-by-line in exact sequential order!
+      if (targetCell) {
+        const imgInfo = this.app.markdownModule.extractImageFromText(textData);
+        if (imgInfo) {
+          e.preventDefault();
+          this.app.tableModule.insertImageIntoCell(targetCell, imgInfo.src);
+          if (this.app.history) this.app.history.pushState('paste_image');
+          return;
+        }
+      }
+
+      units = this.app.parseMarkdownToOutlineUnits(textData);
+      pasteSourceType = 'ai_markdown';
+    }
+
+    if (units && units.length > 0) {
+      e.preventDefault();
+
+      // If user is actively typing inside an existing text block and pastes a single clean text snippet
+      if (isTyping && activeEl && activeEl.isContentEditable && units.length === 1 && units[0].type === 'text') {
+        document.execCommand('insertHTML', false, units[0].content);
+        if (this.app.history) this.app.history.debouncePush('paste_text');
+        return;
+      }
+
+      let targetBox = this.app.selectedNoteBox || (activeEl ? this.app.findNoteBox(activeEl.closest('.note-box')?.dataset?.boxId) : null);
+      let anchorBlock = null;
+
+      if (isTyping && targetBox) {
+        const selection = window.getSelection();
+        anchorBlock = selection.anchorNode?.parentElement?.closest('.canvas-block') || activeEl.closest('.canvas-block');
+      } else {
+        // Canvas paste: spawn new NoteBox at mouse position
+        targetBox = this.app.createNoteBox(this.mouseCanvasPos.x, this.mouseCanvasPos.y, 480);
+        targetBox.contentArea.innerHTML = '';
+      }
+
+      this.app.insertOutlineUnits(units, targetBox, anchorBlock);
+      this.app.selectNoteBox(targetBox);
+      if (this.app.history) this.app.history.pushState(pasteSourceType === 'ai_markdown' ? 'paste_ai_markdown' : 'paste_rich_content');
+      return;
+    }
+
+    // 4. Pasting onto Canvas when NOT typing (outside HTML table or plain text)
+    if (!isTyping) {
+      if (htmlData && htmlData.includes('<table')) {
+        e.preventDefault();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlData, 'text/html');
+        const domTable = doc.querySelector('table');
+        if (domTable) {
+          const newBox = this.app.createNoteBox(this.mouseCanvasPos.x, this.mouseCanvasPos.y, 440);
+          newBox.contentArea.innerHTML = '';
+          const tableBlock = this.app.tableModule.createTableFromDOM(domTable);
+          newBox.contentArea.appendChild(tableBlock);
+          this.app.flowEngine.attachGripDrag(tableBlock, newBox);
+          if (this.app.history) this.app.history.pushState('paste_table');
+          return;
+        }
+      }
+
+      if (textData.trim().length > 0) {
+        e.preventDefault();
+        const newBox = this.app.createNoteBox(this.mouseCanvasPos.x, this.mouseCanvasPos.y);
+        newBox.contentArea.innerHTML = '';
+        const lines = textData.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
+        lines.forEach(line => newBox.addTextBlock(line));
+        if (lines.length === 0) newBox.addTextBlock(textData);
+        if (this.app.history) this.app.history.pushState('paste_outside_text');
+        return;
+      }
+    }
+
+    // 5. If typing inside a note box:
+    // Native paste handles plain text insertion cleanly!
+    if (this.app.history) {
+      this.app.history.debouncePush('paste_text');
+    }
+  }
+
+  /**
    * Paste cloned Note Box from clipboard
    */
   pasteNoteBox(clipboardData, x, y) {
@@ -291,33 +565,7 @@ class KeyboardController {
   }
 
   /**
-   * Paste single item as a brand new Note Box
-   */
-  pasteItemToNewBox(itemHtml, x, y) {
-    const newBox = this.app.createNoteBox(x, y, 360);
-    newBox.contentArea.innerHTML = itemHtml;
-    this.rebindContainerElements(newBox);
-    this.app.selectNoteBox(newBox);
-  }
-
-  /**
-   * Paste single item directly into the active Note Box
-   */
-  pasteItemIntoActiveBox(itemHtml) {
-    const targetBox = this.app.selectedNoteBox;
-    if (!targetBox) return;
-
-    const temp = document.createElement('div');
-    temp.innerHTML = itemHtml;
-    const block = temp.firstElementChild;
-    if (block) {
-      targetBox.contentArea.appendChild(block);
-      this.rebindBlockElements(block, targetBox);
-    }
-  }
-
-  /**
-   * Reconnect all interactive handlers (grips, crop tools, tables) to newly pasted elements
+   * Reconnect interactive handlers to cloned note container
    */
   rebindContainerElements(noteBox) {
     noteBox.contentArea.querySelectorAll('.canvas-block').forEach(block => {
@@ -328,25 +576,22 @@ class KeyboardController {
   rebindBlockElements(block, noteBox) {
     this.app.flowEngine.attachGripDrag(block, noteBox);
 
-    // Rebind table click
     const tableWrapper = block.querySelector('.table-wrapper');
     if (tableWrapper) {
       tableWrapper.addEventListener('click', (e) => {
         e.stopPropagation();
-        document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
-        tableWrapper.classList.add('active-selected');
+        this.app.selectObject(tableWrapper, 'table');
       });
     }
 
-    // Rebind image click & crop
+    const card = block.querySelector('.image-card');
     const img = block.querySelector('.image-container img');
-    if (img) {
+    if (img && card) {
       img.draggable = false;
       img.addEventListener('dragstart', (e) => e.preventDefault());
       img.addEventListener('click', (e) => {
         e.stopPropagation();
-        document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
-        block.querySelector('.image-card')?.classList.add('active-selected');
+        this.app.selectObject(card, 'image');
       });
       const cropBtn = block.querySelector('.image-tool-btn');
       if (cropBtn) {
@@ -356,15 +601,14 @@ class KeyboardController {
         };
       }
       const captionBtn = block.querySelector('.caption-toggle-btn');
-      const card = block.querySelector('.image-card');
-      if (captionBtn && card) {
+      if (captionBtn) {
         captionBtn.onclick = (e) => {
           e.stopPropagation();
           this.app.imageModule.toggleCaption(card, captionBtn);
         };
       }
       const removeBtn = block.querySelector('.caption-remove-btn');
-      if (removeBtn && card) {
+      if (removeBtn) {
         removeBtn.onclick = (e) => {
           e.stopPropagation();
           card.querySelector('.image-caption-wrapper')?.remove();

@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="components.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
 </head>
 <body>
   <!-- Top Application Header & Ribbon -->
@@ -45,6 +47,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
           <span>New Note</span>
         </button>
+        <button class="ribbon-btn" id="btn-insert-paragraph" title="New Draggable Paragraph Block (Ctrl+Enter)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 4v16M17 4v16M19 4H9.5a4.5 4.5 0 0 0 0 9H13"/></svg>
+          <span>¶ Paragraph</span>
+        </button>
         <button class="ribbon-btn" id="btn-insert-table" title="Insert Table (or press Tab after word)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
           <span>Table</span>
@@ -52,6 +58,10 @@
         <button class="ribbon-btn" id="btn-insert-image" title="Insert Image">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           <span>Picture</span>
+        </button>
+        <button class="ribbon-btn" id="btn-insert-math" title="Insert Math Equation (Alt+=)">
+          <span style="font-weight: bold; font-size: 15px; font-family: serif; color: var(--primary-purple);">∑</span>
+          <span>Equation</span>
         </button>
         <input type="file" id="image-file-input" accept="image/*" style="display:none;">
       </div>
@@ -153,6 +163,8 @@
   <script src="src/canvas.js"></script>
   <script src="src/table_module.js"></script>
   <script src="src/image_module.js"></script>
+  <script src="src/math_module.js"></script>
+  <script src="src/markdown_module.js"></script>
   <script src="src/element_flow.js"></script>
   <script src="src/note_box.js"></script>
   <script src="src/keyboard_shortcuts.js"></script>

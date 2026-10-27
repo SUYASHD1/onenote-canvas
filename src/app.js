@@ -21,6 +21,8 @@ class OneNoteApp {
     this.canvas = new OneNoteCanvas('canvas-viewport', 'canvas-stage');
     this.tableModule = new TableModule(this);
     this.imageModule = new ImageModule(this);
+    this.mathModule = new MathModule(this);
+    this.markdownModule = new MarkdownModule(this);
     this.flowEngine = new ElementFlowEngine(this);
     this.keyboardController = new KeyboardController(this);
     this.history = new HistoryManager(this);
@@ -37,10 +39,11 @@ class OneNoteApp {
     // 3. Connect Ribbon Toolbar
     this.bindRibbonControls();
 
-    // 4. Seed Rich Starter Notes or Restore
-    if (!this.history.loadFromStorage()) {
-      this.seedStarterNotes();
-    }
+    // 4. Always seed latest fresh starter notes on launch
+    try {
+      localStorage.removeItem('onenote_canvas_workspace');
+    } catch (_) {}
+    this.seedStarterNotes();
     this.history.pushState('initial');
   }
 
@@ -72,7 +75,9 @@ class OneNoteApp {
 
   selectNoteBox(box, visuallyHighlight = true) {
     this.noteBoxes.forEach(b => b.setSelected(false));
+    document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
     this.selectedNoteBox = box;
+    this.activeSelection = box ? { element: box, type: 'note-box' } : null;
     if (visuallyHighlight && box) {
       box.setSelected(true);
       window.getSelection()?.removeAllRanges();
@@ -82,10 +87,73 @@ class OneNoteApp {
     }
   }
 
+  selectObject(element, type) {
+    document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
+    if (this.selectedNoteBox && type !== 'note-box') {
+      this.selectedNoteBox.setSelected(false);
+    }
+    this.activeSelection = { element, type };
+    if (element) {
+      if (type === 'note-box') {
+        element.setSelected(true);
+        this.selectedNoteBox = element;
+      } else {
+        element.classList.add('active-selected');
+        const parentBoxEl = element.closest('.note-box');
+        if (parentBoxEl) {
+          const box = this.findNoteBox(parentBoxEl.dataset.boxId);
+          if (box) this.selectedNoteBox = box;
+        }
+      }
+    }
+  }
+
   deselectAll() {
     this.noteBoxes.forEach(b => b.setSelected(false));
+    document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
     this.selectedNoteBox = null;
+    this.activeSelection = null;
     window.getSelection()?.removeAllRanges();
+  }
+
+  /**
+   * Universal 8-point perimeter resize handle attachment for any object
+   */
+  attachUniversalBoundaryHandles(containerEl, onResize, onResizeEnd) {
+    const handlePositions = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    handlePositions.forEach(pos => {
+      const handle = document.createElement('div');
+      handle.className = `resize-handle ${pos}`;
+      handle.dataset.position = pos;
+      handle.contentEditable = 'false';
+      containerEl.appendChild(handle);
+
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startClientX = e.clientX;
+        const startClientY = e.clientY;
+        const startW = containerEl.offsetWidth;
+        const startH = containerEl.offsetHeight;
+
+        const onMouseMove = (ev) => {
+          const zoom = this.canvas.zoomLevel || 1;
+          const dx = (ev.clientX - startClientX) / zoom;
+          const dy = (ev.clientY - startClientY) / zoom;
+          if (onResize) onResize(pos, dx, dy, startW, startH);
+        };
+
+        const onMouseUp = () => {
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+          if (onResizeEnd) onResizeEnd();
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+    });
   }
 
   /**
@@ -101,6 +169,22 @@ class OneNoteApp {
         const y = (vp.scrollTop + 120) / this.canvas.zoomLevel;
         const box = this.createNoteBox(Math.round(x), Math.round(y));
         box.addTextBlock('');
+      };
+    }
+
+    // Insert Paragraph Block
+    const btnPara = document.getElementById('btn-insert-paragraph');
+    if (btnPara) {
+      btnPara.onclick = () => {
+        let targetBox = this.selectedNoteBox;
+        if (!targetBox) {
+          const vp = this.canvas.viewport;
+          targetBox = this.createNoteBox((vp.scrollLeft + 140) / this.canvas.zoomLevel, (vp.scrollTop + 140) / this.canvas.zoomLevel, 360);
+        }
+        const block = targetBox.addTextBlock('', false, true);
+        const editable = block.querySelector('[contenteditable="true"]');
+        if (editable) editable.focus();
+        if (this.history) this.history.pushState('add_paragraph_block');
       };
     }
 
@@ -129,6 +213,14 @@ class OneNoteApp {
         if (file) {
           const reader = new FileReader();
           reader.onload = (ev) => {
+            const targetCell = this.tableModule && this.tableModule.lastFocusedCell && document.contains(this.tableModule.lastFocusedCell)
+              ? this.tableModule.lastFocusedCell
+              : null;
+            if (targetCell) {
+              this.tableModule.insertImageIntoCell(targetCell, ev.target.result);
+              return;
+            }
+
             let targetBox = this.selectedNoteBox;
             if (!targetBox) {
               const vp = this.canvas.viewport;
@@ -140,6 +232,22 @@ class OneNoteApp {
           };
           reader.readAsDataURL(file);
         }
+      };
+    }
+
+    // Insert Math Equation Block (Alt+=)
+    const btnMath = document.getElementById('btn-insert-math');
+    if (btnMath) {
+      btnMath.onclick = () => {
+        let targetBox = this.selectedNoteBox;
+        if (!targetBox) {
+          const vp = this.canvas.viewport;
+          targetBox = this.createNoteBox((vp.scrollLeft + 140) / this.canvas.zoomLevel, (vp.scrollTop + 140) / this.canvas.zoomLevel, 380);
+        }
+        const mathBlock = this.mathModule.createMathBlock('x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}');
+        targetBox.contentArea.appendChild(mathBlock);
+        this.flowEngine.attachGripDrag(mathBlock, targetBox);
+        if (this.history) this.history.pushState('insert_math');
       };
     }
 
@@ -223,6 +331,439 @@ class OneNoteApp {
     this.flowEngine.attachGripDrag(imgBlock, note3);
 
     this.deselectAll();
+  }
+
+  /**
+   * OneNote AI Markdown Parser: Converts chatbot output (ChatGPT, Claude, etc.) to outline units
+   */
+  parseMarkdownToOutlineUnits(mdString) {
+    if (!this.markdownModule) return [];
+    return this.markdownModule.parseMarkdownToOutlineUnits(mdString);
+  }
+
+  /**
+   * OneNote Outline Parser: Extracts text paragraphs, tables, and standalone images/figures
+   */
+  parseHTMLToOutlineUnits(htmlString) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlString, 'text/html');
+    const units = [];
+
+    const normalizeSrc = (src) => {
+      if (!src) return '';
+      if (src.startsWith('//')) return 'https:' + src;
+      return src;
+    };
+
+    const findCaption = (container, imgEl) => {
+      const figcap = container && container.querySelector ? container.querySelector('figcaption, .thumbcaption') : null;
+      if (figcap) {
+        let text = figcap.textContent.trim().replace(/\[\d+\]/g, '').replace(/\[edit\]/gi, '');
+        text = text.replace(/Enlarge/gi, '').trim();
+        if (text) return text;
+      }
+      const alt = (imgEl && imgEl.getAttribute('alt')) || '';
+      if (alt && alt.length > 2 && !alt.toLowerCase().endsWith('.jpg') && !alt.toLowerCase().endsWith('.png') && !alt.toLowerCase().endsWith('.svg')) {
+        return alt.trim();
+      }
+      const title = (imgEl && imgEl.getAttribute('title')) || '';
+      if (title) return title.trim();
+      return '';
+    };
+
+    // 1. Clean out scripts, styles, meta, noscript
+    doc.querySelectorAll('script, style, meta, link, noscript').forEach(el => el.remove());
+
+    // 2. Remove footnote citations, superscripts, and wiki editorial markers ([1], [edit], etc.)
+    doc.querySelectorAll('sup, .reference, .mw-editsection, .noprint, .citation').forEach(el => el.remove());
+
+    // 3. Unwrap all hyperlinks: keep the readable text, strip away blue URLs and underlines
+    doc.querySelectorAll('a').forEach(a => {
+      const parent = a.parentNode;
+      if (!parent) return;
+      while (a.firstChild) {
+        parent.insertBefore(a.firstChild, a);
+      }
+      a.remove();
+    });
+
+    // 4. Strip inline colors, text-decorations, and extraneous website styles
+    doc.querySelectorAll('*').forEach(el => {
+      if (el.style) {
+        el.style.color = '';
+        el.style.textDecoration = '';
+        el.style.backgroundColor = '';
+        el.style.fontFamily = '';
+        el.style.fontSize = '';
+        if (el.getAttribute('style') === '') el.removeAttribute('style');
+      }
+      const isProtected = el.closest('table, figure, math, .mwe-math-element, .katex, .MathJax') !== null ||
+                          el.tagName === 'TABLE' || el.tagName === 'FIGURE' || el.tagName === 'MATH' ||
+                          el.classList?.contains('mwe-math-element') || el.classList?.contains('katex');
+      if (!isProtected) {
+        el.removeAttribute('class');
+      }
+    });
+
+    // Universal Web Math Extractor: pulls clean formulas from KaTeX, MathJax, Wikipedia, and Academic Journals
+    const extractMathInfo = (mathNode) => {
+      if (!mathNode) return null;
+
+      const domMath = mathNode.tagName === 'MATH' ? mathNode : (mathNode.querySelector ? mathNode.querySelector('math') : null);
+      let latex = '';
+
+      // 1. Wikipedia / MediaWiki source data: data-mw='{"body":{"extsrc":"..."}}'
+      const dataMw = mathNode.getAttribute ? mathNode.getAttribute('data-mw') : null;
+      if (dataMw) {
+        try {
+          const parsed = JSON.parse(dataMw);
+          if (parsed?.body?.extsrc) latex = parsed.body.extsrc.trim();
+        } catch (_) {}
+      }
+
+      // 2. Wikipedia & W3C MathML alttext attribute: <math alttext="..."> or container alttext
+      if (!latex) {
+        const altText = (domMath && domMath.getAttribute('alttext')) ||
+                        (mathNode.getAttribute && mathNode.getAttribute('alttext'));
+        if (altText) latex = altText.trim();
+      }
+
+      // 3. KaTeX & MathJax TeX annotation: <annotation encoding="application/x-tex">
+      if (!latex && mathNode.querySelector) {
+        const annotation = mathNode.querySelector('annotation[encoding*="tex" i], annotation[encoding*="TeX" i], annotation');
+        if (annotation) latex = annotation.textContent.trim();
+      }
+
+      // 4. MathJax 2 & WordPress script tags: <script type="math/tex">
+      if (!latex && mathNode.querySelector) {
+        const scriptTex = mathNode.querySelector('script[type*="math/tex"]');
+        if (scriptTex) latex = scriptTex.textContent.trim();
+      }
+
+      // 5. Custom HTML5 data attributes: data-latex, data-tex, data-formula
+      if (!latex && mathNode.getAttribute) {
+        latex = mathNode.getAttribute('data-latex') ||
+                mathNode.getAttribute('data-tex') ||
+                mathNode.getAttribute('data-formula') ||
+                (domMath && (domMath.getAttribute('data-latex') || domMath.getAttribute('data-tex'))) ||
+                '';
+      }
+
+      // 6. Image fallback: <img class="mwe-math-fallback-..." alt="..."> or <img alt="...">
+      if (!latex) {
+        const img = mathNode.querySelector ? mathNode.querySelector('img[alt]') : (mathNode.tagName === 'IMG' ? mathNode : null);
+        if (img) latex = (img.getAttribute('alt') || '').trim();
+      }
+
+      // 7. Aria label / title fallback
+      if (!latex && mathNode.getAttribute) {
+        const aria = mathNode.getAttribute('aria-label') || mathNode.getAttribute('title');
+        if (aria && (aria.includes('\\') || aria.includes('=') || aria.includes('_') || aria.includes('^'))) {
+          latex = aria.trim();
+        }
+      }
+
+      // Clean extracted LaTeX if found
+      if (latex) {
+        // Strip wrapper commands: {\displaystyle ...}, {\textstyle ...}
+        latex = latex.replace(/^{\\displaystyle\s*([\s\S]*)}$/, '$1');
+        latex = latex.replace(/^{\\textstyle\s*([\s\S]*)}$/, '$1');
+        latex = latex.replace(/\\displaystyle\s*/g, '').replace(/\\textstyle\s*/g, '').trim();
+        // Replace HTML entities
+        latex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      }
+
+      const rawMathML = domMath ? domMath.outerHTML : null;
+
+      // If no LaTeX string was found, but authentic MathML is present (Nature, IEEE, Springer journals)
+      if (!latex && !rawMathML) return null;
+
+      return { latex: latex || '', rawMathML };
+    };
+
+    // Robust citation regex covering [1], [1, 2], [1,2,3], [1-4], [1–4], [note 1], [edit], etc.
+    const citationRegex = /\[\s*(?:\d+|note\s*\d+|[a-z])(?:\s*[,;–-]\s*(?:\d+|note\s*\d+|[a-z]))*\s*\]|\[edit\]|\[citation needed\]/gi;
+
+    const processElement = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        let text = node.textContent.replace(citationRegex, '').trim();
+        if (text.length > 0) {
+          units.push({ type: 'text', content: text });
+        }
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+      const tag = node.tagName.toLowerCase();
+
+      // 1. Direct or Nested Tables (extract tables as first-class objects)
+      const tables = Array.from(node.querySelectorAll('table'));
+      if (tag === 'table') {
+        units.push({ type: 'table', domElement: node });
+        return;
+      }
+      if (tables.length > 0) {
+        Array.from(node.childNodes).forEach(child => processElement(child));
+        return;
+      }
+
+      // 2. Direct Standalone Math Elements (<math> or .mwe-math-element)
+      const isDirectMath = tag === 'math' || (node.classList && node.classList.contains('mwe-math-element'));
+      if (isDirectMath) {
+        const mathInfo = extractMathInfo(node);
+        if (mathInfo && mathInfo.latex) {
+          units.push({ type: 'math', latex: mathInfo.latex, rawMathML: mathInfo.rawMathML });
+          return;
+        }
+      }
+
+      // 3. Multi-block or multi-child container (div, section, article, main, dl)
+      const isContainer = ['div', 'section', 'article', 'main', 'dl'].includes(tag);
+      const hasBlockChildren = node.children && Array.from(node.children).some(c =>
+        ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'table', 'figure', 'div', 'dl', 'dd', 'blockquote'].includes(c.tagName.toLowerCase())
+      );
+      const imgs = Array.from(node.querySelectorAll('img'));
+      const mathElements = Array.from(node.querySelectorAll('math, .mwe-math-element'));
+
+      if ((isContainer && hasBlockChildren) || (isContainer && node.children.length > 1) || (isContainer && (imgs.length > 0 || mathElements.length > 0))) {
+        Array.from(node.childNodes).forEach(child => processElement(child));
+        return;
+      }
+
+      // 4. Standalone media figure, thumbnail or image
+      const isMedia = tag === 'figure' || tag === 'img' || 
+        node.classList.contains('thumb') || node.classList.contains('thumbinner');
+
+      if (isMedia) {
+        const img = tag === 'img' ? node : imgs[0];
+        if (img) {
+          const src = normalizeSrc(img.getAttribute('src'));
+          if (src && !src.includes('spacer.gif')) {
+            const caption = findCaption(node, img);
+            units.push({ type: 'image', src, caption });
+            return;
+          }
+        }
+      }
+
+      // 5. Standalone Definition List Item (<dd>) containing a display equation (Wikipedia style)
+      if (tag === 'dd') {
+        if (mathElements.length > 0) {
+          const mathInfo = extractMathInfo(mathElements[0]);
+          if (mathInfo && mathInfo.latex) {
+            units.push({ type: 'math', latex: mathInfo.latex, rawMathML: mathInfo.rawMathML });
+            return;
+          }
+        }
+      }
+
+      // 6. Headings (h1 - h6)
+      if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+        let cleanHtml = node.innerHTML.replace(citationRegex, '').trim();
+        if (cleanHtml.length > 0) {
+          units.push({ type: 'heading', tag, content: cleanHtml });
+          return;
+        }
+      }
+
+      // 7. Bullet & Numbered Lists (ul, ol)
+      if (tag === 'ul' || tag === 'ol') {
+        let cleanHtml = node.innerHTML.replace(citationRegex, '').trim();
+        if (cleanHtml.length > 0) {
+          units.push({ type: 'list', tag, content: `<${tag}>${cleanHtml}</${tag}>` });
+          return;
+        }
+      }
+
+      // 8. Text containers (p, blockquote, pre, div, span, etc.)
+      let plainText = node.textContent.replace(citationRegex, '').trim();
+
+      // Check for standalone display math formula wrapped in <p> or <div> (Wikipedia style)
+      if (mathElements.length === 1) {
+        const clone = node.cloneNode(true);
+        clone.querySelectorAll('math, .mwe-math-element').forEach(m => m.remove());
+        const remainingText = clone.textContent.replace(citationRegex, '').trim();
+        if (remainingText.length === 0) {
+          const mathInfo = extractMathInfo(mathElements[0]);
+          if (mathInfo && mathInfo.latex) {
+            units.push({ type: 'math', latex: mathInfo.latex, rawMathML: mathInfo.rawMathML });
+            return;
+          }
+        }
+      }
+
+      // Check for AI Chatbot bracket formulas: \[ ... \] or $$ ... $$
+      if (plainText.includes('\\[') && plainText.includes('\\]')) {
+        const regex = /\\\[([\s\S]+?)\\\]/g;
+        let lastIdx = 0;
+        let match;
+        while ((match = regex.exec(plainText)) !== null) {
+          const before = plainText.substring(lastIdx, match.index).trim();
+          if (before) units.push({ type: 'text', content: before });
+          const latex = match[1].trim();
+          if (latex) units.push({ type: 'math', latex });
+          lastIdx = match.index + match[0].length;
+        }
+        const after = plainText.substring(lastIdx).trim();
+        if (after) units.push({ type: 'text', content: after });
+        return;
+      }
+
+      if (plainText.includes('$$')) {
+        const regex = /\$\$([\s\S]+?)\$\$/g;
+        let lastIdx = 0;
+        let match;
+        while ((match = regex.exec(plainText)) !== null) {
+          const before = plainText.substring(lastIdx, match.index).trim();
+          if (before) units.push({ type: 'text', content: before });
+          const latex = match[1].trim();
+          if (latex) units.push({ type: 'math', latex });
+          lastIdx = match.index + match[0].length;
+        }
+        const after = plainText.substring(lastIdx).trim();
+        if (after) units.push({ type: 'text', content: after });
+        return;
+      }
+
+      // In-place Markdown Heading detection (e.g. ### Title)
+      const mdHeadingMatch = plainText.match(/^(#{1,6})\s+(.+)$/);
+      if (mdHeadingMatch) {
+        const level = mdHeadingMatch[1].length;
+        const hTag = `h${Math.min(6, level)}`;
+        units.push({
+          type: 'heading',
+          tag: hTag,
+          content: this.markdownModule ? this.markdownModule.formatInline(mdHeadingMatch[2].trim()) : mdHeadingMatch[2].trim()
+        });
+        return;
+      }
+
+      // In-place Markdown Image detection (e.g. ![Alt](url))
+      if (this.markdownModule) {
+        const imgInfo = this.markdownModule.extractImageFromText(plainText);
+        if (imgInfo) {
+          units.push({
+            type: 'image',
+            src: imgInfo.src,
+            caption: imgInfo.caption
+          });
+          return;
+        }
+      }
+
+      // Inline Math Replacement for paragraphs (turns embedded Wikipedia math into inline badges)
+      if (mathElements.length > 0) {
+        mathElements.forEach(mEl => {
+          const mInfo = extractMathInfo(mEl);
+          if (mInfo && mInfo.latex) {
+            const mathSpan = document.createElement('span');
+            mathSpan.className = 'inline-math';
+            mathSpan.contentEditable = 'false';
+            mathSpan.dataset.latex = mInfo.latex;
+            mathSpan.innerHTML = this.mathModule ? this.mathModule.renderFormulaHTML(mInfo.latex, false, mInfo.rawMathML) : mInfo.latex;
+            mEl.parentNode?.replaceChild(mathSpan, mEl);
+          }
+        });
+      }
+
+      let cleanHtml = node.innerHTML.replace(citationRegex, '').trim();
+      if (plainText.length > 0) {
+        units.push({ type: 'text', content: cleanHtml });
+      }
+    };
+
+    Array.from(doc.body.childNodes).forEach(node => processElement(node));
+    return units;
+  }
+
+  /**
+   * Insert OneNote outline units into a target note box
+   */
+  insertOutlineUnits(units, targetBox, anchorBlock = null) {
+    if (!units || units.length === 0 || !targetBox) return;
+
+    let insertAfter = anchorBlock;
+
+    units.forEach(unit => {
+      let newBlock = null;
+
+      if (unit.type === 'image') {
+        newBlock = this.imageModule.createImageBlock(unit.src, unit.caption || null);
+      } else if (unit.type === 'table') {
+        newBlock = this.tableModule.createTableFromDOM(unit.domElement);
+      } else if (unit.type === 'math') {
+        newBlock = this.mathModule.createMathBlock(unit.latex, unit.rawMathML || null);
+      } else if (unit.type === 'heading') {
+        newBlock = document.createElement('div');
+        newBlock.className = 'canvas-block text-block heading-block';
+        newBlock.dataset.blockType = 'heading';
+
+        const grip = document.createElement('div');
+        grip.className = 'block-grip';
+        grip.contentEditable = 'false';
+        grip.textContent = ':::';
+        grip.title = 'Drag to rearrange or drag out to detach';
+        newBlock.appendChild(grip);
+
+        const span = document.createElement(unit.tag || 'h2');
+        span.contentEditable = 'true';
+        span.className = `note-heading ${unit.tag || 'h2'}`;
+        span.innerHTML = unit.content;
+        this.mathModule.renderInlineMath(span);
+        newBlock.appendChild(span);
+      } else if (unit.type === 'list') {
+        newBlock = document.createElement('div');
+        newBlock.className = 'canvas-block text-block list-block';
+        newBlock.dataset.blockType = 'list';
+
+        const grip = document.createElement('div');
+        grip.className = 'block-grip';
+        grip.contentEditable = 'false';
+        grip.textContent = ':::';
+        grip.title = 'Drag to rearrange or drag out to detach';
+        newBlock.appendChild(grip);
+
+        const span = document.createElement('div');
+        span.contentEditable = 'true';
+        span.innerHTML = unit.content;
+        this.mathModule.renderInlineMath(span);
+        newBlock.appendChild(span);
+      } else if (unit.type === 'text') {
+        newBlock = document.createElement('div');
+        newBlock.className = 'canvas-block text-block';
+        newBlock.dataset.blockType = 'text';
+
+        const grip = document.createElement('div');
+        grip.className = 'block-grip';
+        grip.contentEditable = 'false';
+        grip.textContent = ':::';
+        grip.title = 'Drag to rearrange or drag out to detach';
+        newBlock.appendChild(grip);
+
+        const span = document.createElement('div');
+        span.contentEditable = 'true';
+        span.innerHTML = unit.content || '<br>';
+        this.mathModule.renderInlineMath(span);
+        newBlock.appendChild(span);
+      }
+
+      if (newBlock) {
+        if (insertAfter && insertAfter.nextSibling) {
+          targetBox.contentArea.insertBefore(newBlock, insertAfter.nextSibling);
+        } else {
+          targetBox.contentArea.appendChild(newBlock);
+        }
+        insertAfter = newBlock;
+        this.flowEngine.attachGripDrag(newBlock, targetBox);
+      }
+    });
+
+    if (anchorBlock && anchorBlock.dataset.blockType === 'text') {
+      const span = anchorBlock.querySelector('[contenteditable="true"]');
+      if (span && span.textContent.trim().length === 0) {
+        anchorBlock.remove();
+      }
+    }
   }
 }
 

@@ -11,6 +11,7 @@
 class TableModule {
   constructor(app) {
     this.app = app;
+    this.lastFocusedCell = null;
     this.layouts = [
       { id: 'layout-classic-grid', name: 'Classic Grid' },
       { id: 'layout-zebra-banded', name: 'Zebra Banded' },
@@ -158,10 +159,12 @@ class TableModule {
     const block = document.createElement('div');
     block.className = 'canvas-block table-block';
     block.dataset.blockType = 'table';
+    block.contentEditable = 'false';
 
     // Left hover grip
     const grip = document.createElement('div');
     grip.className = 'block-grip';
+    grip.contentEditable = 'false';
     grip.title = 'Drag to rearrange or drag out to detach';
     grip.textContent = ':::';
     block.appendChild(grip);
@@ -169,19 +172,21 @@ class TableModule {
     // Wrapper container
     const wrapper = document.createElement('div');
     wrapper.className = 'table-wrapper';
+    wrapper.contentEditable = 'false';
     wrapper.addEventListener('click', (e) => {
       e.stopPropagation();
-      document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
-      wrapper.classList.add('active-selected');
+      this.app.selectObject(wrapper, 'table');
     });
 
     // Toolbar with layout switcher and row/col actions
     const toolbar = document.createElement('div');
     toolbar.className = 'table-toolbar';
+    toolbar.contentEditable = 'false';
 
     // 4-Layout Format Dropdown
     const select = document.createElement('select');
     select.className = 'table-layout-select';
+    select.contentEditable = 'false';
     select.title = 'Change Table Layout Style';
     this.layouts.forEach(layout => {
       const opt = document.createElement('option');
@@ -193,6 +198,7 @@ class TableModule {
 
     const table = document.createElement('table');
     table.className = `canvas-table ${layoutClass}`;
+    table.contentEditable = 'false';
 
     select.addEventListener('change', () => {
       this.layouts.forEach(l => table.classList.remove(l.id));
@@ -202,22 +208,41 @@ class TableModule {
     // Add Row Button
     const addRowBtn = document.createElement('button');
     addRowBtn.className = 'table-tool-btn';
+    addRowBtn.contentEditable = 'false';
     addRowBtn.textContent = '+ Row';
     addRowBtn.title = 'Insert row at bottom';
     addRowBtn.onclick = (e) => { e.preventDefault(); this.addRow(table); };
 
+    // Remove Row Button
+    const delRowBtn = document.createElement('button');
+    delRowBtn.className = 'table-tool-btn danger';
+    delRowBtn.contentEditable = 'false';
+    delRowBtn.textContent = '- Row';
+    delRowBtn.title = 'Remove selected or bottom row';
+    delRowBtn.onclick = (e) => { e.preventDefault(); this.removeRow(table); };
+
     // Add Column Button
     const addColBtn = document.createElement('button');
     addColBtn.className = 'table-tool-btn';
+    addColBtn.contentEditable = 'false';
     addColBtn.textContent = '+ Col';
     addColBtn.title = 'Insert column on right';
     addColBtn.onclick = (e) => { e.preventDefault(); this.addColumn(table); };
 
+    // Remove Column Button
+    const delColBtn = document.createElement('button');
+    delColBtn.className = 'table-tool-btn danger';
+    delColBtn.contentEditable = 'false';
+    delColBtn.textContent = '- Col';
+    delColBtn.title = 'Remove selected or rightmost column';
+    delColBtn.onclick = (e) => { e.preventDefault(); this.removeColumn(table); };
+
     // Delete Table Button
     const delBtn = document.createElement('button');
     delBtn.className = 'table-tool-btn danger';
-    delBtn.textContent = '×';
-    delBtn.title = 'Delete Table';
+    delBtn.contentEditable = 'false';
+    delBtn.textContent = '× Table';
+    delBtn.title = 'Delete Entire Table';
     delBtn.onclick = (e) => {
       e.preventDefault();
       block.remove();
@@ -225,7 +250,9 @@ class TableModule {
 
     toolbar.appendChild(select);
     toolbar.appendChild(addRowBtn);
+    toolbar.appendChild(delRowBtn);
     toolbar.appendChild(addColBtn);
+    toolbar.appendChild(delColBtn);
     toolbar.appendChild(delBtn);
 
     // Build Table Rows & Cells
@@ -235,6 +262,10 @@ class TableModule {
         const cell = rIdx === 0 ? document.createElement('th') : document.createElement('td');
         cell.contentEditable = 'true';
         cell.textContent = val || '';
+        cell.addEventListener('focus', () => {
+          this.lastFocusedCell = cell;
+        });
+        this.attachCellResizers(cell, table);
         tr.appendChild(cell);
       });
       table.appendChild(tr);
@@ -242,6 +273,34 @@ class TableModule {
 
     wrapper.appendChild(toolbar);
     wrapper.appendChild(table);
+
+    // Universal 8-Point Perimeter Resize Handles for the entire table
+    this.app.attachUniversalBoundaryHandles(
+      wrapper,
+      (pos, dx, dy, startW, startH) => {
+        let newW = startW;
+        if (pos.includes('e')) newW = Math.max(160, startW + dx);
+        if (pos.includes('w')) newW = Math.max(160, startW - dx);
+        if (pos === 'se' || pos === 'sw' || pos === 'ne' || pos === 'nw') {
+          const scale = Math.max(0.3, (startW + dx) / startW);
+          newW = Math.max(160, startW * scale);
+        }
+        table.style.width = `${Math.round(newW)}px`;
+
+        if (pos.includes('s')) {
+          const rowCount = table.rows.length;
+          const targetTotalH = Math.max(rowCount * 24, startH + dy);
+          const perRowH = Math.max(24, Math.round(targetTotalH / rowCount));
+          Array.from(table.rows).forEach(tr => {
+            tr.style.height = `${perRowH}px`;
+          });
+        }
+      },
+      () => {
+        if (this.app.history) this.app.history.pushState('resize_table');
+      }
+    );
+
     block.appendChild(wrapper);
 
     return block;
@@ -250,7 +309,7 @@ class TableModule {
   createTableFromDOM(domTable) {
     const rows = Array.from(domTable.querySelectorAll('tr'));
     const data = rows.map(tr => {
-      return Array.from(tr.querySelectorAll('th, td')).map(cell => cell.innerText.trim());
+      return Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || cell.innerText || '').trim());
     });
     return this.createTableFromData(data);
   }
@@ -262,9 +321,30 @@ class TableModule {
       const td = document.createElement('td');
       td.contentEditable = 'true';
       td.textContent = '';
+      td.addEventListener('focus', () => {
+        this.lastFocusedCell = td;
+      });
+      this.attachCellResizers(td, table);
       tr.appendChild(td);
     }
     table.appendChild(tr);
+    if (this.app && this.app.history) this.app.history.pushState('add_table_row');
+  }
+
+  removeRow(table) {
+    if (table.rows.length <= 1) return; // Keep at least 1 row
+    let targetTr = null;
+    if (this.lastFocusedCell && table.contains(this.lastFocusedCell)) {
+      targetTr = this.lastFocusedCell.closest('tr');
+    }
+    if (!targetTr || !table.contains(targetTr)) {
+      targetTr = table.rows[table.rows.length - 1];
+    }
+    if (targetTr) {
+      targetTr.remove();
+      this.lastFocusedCell = null;
+      if (this.app && this.app.history) this.app.history.pushState('remove_table_row');
+    }
   }
 
   addColumn(table) {
@@ -272,8 +352,158 @@ class TableModule {
       const cell = rIdx === 0 ? document.createElement('th') : document.createElement('td');
       cell.contentEditable = 'true';
       cell.textContent = rIdx === 0 ? `Col ${tr.cells.length + 1}` : '';
+      cell.addEventListener('focus', () => {
+        this.lastFocusedCell = cell;
+      });
+      this.attachCellResizers(cell, table);
       tr.appendChild(cell);
     });
+    if (this.app && this.app.history) this.app.history.pushState('add_table_col');
+  }
+
+  removeColumn(table) {
+    if (!table.rows[0] || table.rows[0].cells.length <= 1) return; // Keep at least 1 col
+    let targetColIdx = -1;
+    if (this.lastFocusedCell && table.contains(this.lastFocusedCell)) {
+      targetColIdx = this.lastFocusedCell.cellIndex;
+    }
+    if (targetColIdx < 0 || targetColIdx >= table.rows[0].cells.length) {
+      targetColIdx = table.rows[0].cells.length - 1;
+    }
+    Array.from(table.rows).forEach(tr => {
+      if (tr.cells[targetColIdx]) {
+        tr.cells[targetColIdx].remove();
+      }
+    });
+    this.lastFocusedCell = null;
+    if (this.app && this.app.history) this.app.history.pushState('remove_table_col');
+  }
+
+  /**
+   * Attach interactive column width & row height drag resizers to cell
+   */
+  attachCellResizers(cell, table) {
+    // 1. Column Width Resizer (Right edge)
+    const colResizer = document.createElement('div');
+    colResizer.className = 'col-resizer';
+    colResizer.contentEditable = 'false';
+    colResizer.title = 'Drag to adjust column width';
+
+    colResizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      colResizer.classList.add('resizing');
+      const startX = e.clientX;
+      const startW = cell.offsetWidth;
+      const colIdx = cell.cellIndex;
+
+      const onMouseMove = (ev) => {
+        const dx = ev.clientX - startX;
+        const newW = Math.max(45, startW + dx);
+        Array.from(table.rows).forEach(r => {
+          if (r.cells[colIdx]) {
+            r.cells[colIdx].style.width = `${newW}px`;
+            r.cells[colIdx].style.minWidth = `${newW}px`;
+          }
+        });
+      };
+
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        colResizer.classList.remove('resizing');
+        if (this.app && this.app.history) {
+          this.app.history.pushState('resize_table_col');
+        }
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
+
+    // 2. Row Height Resizer (Bottom edge)
+    const rowResizer = document.createElement('div');
+    rowResizer.className = 'row-resizer';
+    rowResizer.contentEditable = 'false';
+    rowResizer.title = 'Drag to adjust row height';
+
+    rowResizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      rowResizer.classList.add('resizing');
+      const startY = e.clientY;
+      const tr = cell.closest('tr');
+      const startH = tr.offsetHeight;
+
+      const onMouseMove = (ev) => {
+        const dy = ev.clientY - startY;
+        const newH = Math.max(26, startH + dy);
+        tr.style.height = `${newH}px`;
+        Array.from(tr.cells).forEach(c => {
+          c.style.height = `${newH}px`;
+        });
+      };
+
+      const onMouseUp = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        rowResizer.classList.remove('resizing');
+        if (this.app && this.app.history) {
+          this.app.history.pushState('resize_table_row');
+        }
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
+
+    cell.appendChild(colResizer);
+    cell.appendChild(rowResizer);
+  }
+
+  /**
+   * Insert an image directly into a specific table cell
+   */
+  insertImageIntoCell(cell, imageSrc) {
+    if (!cell) return null;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'cell-image-wrapper';
+    wrapper.contentEditable = 'false';
+
+    const img = document.createElement('img');
+    img.src = imageSrc;
+    img.draggable = false;
+    img.alt = 'Table cell image';
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'cell-image-del-btn';
+    delBtn.contentEditable = 'false';
+    delBtn.title = 'Remove Image';
+    delBtn.innerHTML = '×';
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      wrapper.remove();
+      if (this.app && this.app.history) this.app.history.pushState('remove_cell_image');
+    };
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(delBtn);
+
+    // If cell contains only default placeholder text or spaces, clear it
+    if (!cell.textContent.trim()) {
+      cell.innerHTML = '';
+    }
+    cell.appendChild(wrapper);
+
+    // Append trailing space so typing after image remains effortless
+    const spacer = document.createTextNode(' ');
+    cell.appendChild(spacer);
+
+    if (this.app && this.app.history) {
+      this.app.history.pushState('insert_cell_image');
+    }
+    return wrapper;
   }
 }
 

@@ -23,10 +23,12 @@ class ImageModule {
     const block = document.createElement('div');
     block.className = 'canvas-block image-block';
     block.dataset.blockType = 'image';
+    block.contentEditable = 'false';
 
     // Hover Grip
     const grip = document.createElement('div');
     grip.className = 'block-grip';
+    grip.contentEditable = 'false';
     grip.textContent = ':::';
     grip.title = 'Drag to rearrange or drag out to detach';
     block.appendChild(grip);
@@ -34,10 +36,12 @@ class ImageModule {
     // Image Card
     const card = document.createElement('div');
     card.className = 'image-card';
+    card.contentEditable = 'false';
 
     // Container with tools
     const container = document.createElement('div');
     container.className = 'image-container';
+    container.contentEditable = 'false';
 
     const img = document.createElement('img');
     img.src = imageSrc;
@@ -46,19 +50,17 @@ class ImageModule {
     img.draggable = false;
     img.addEventListener('dragstart', (e) => e.preventDefault());
 
-    // Clicking image selects card to keep tools permanently visible
+    // Clicking image selects card and activates universal handles & tools
     img.addEventListener('click', (e) => {
       e.stopPropagation();
-      document.querySelectorAll('.image-card').forEach(c => c.classList.remove('active-selected'));
-      card.classList.add('active-selected');
+      this.app.selectObject(card, 'image');
     });
 
     // Dragging by grabbing the image itself moves the ENTIRE block (image + caption + tools)
     img.addEventListener('mousedown', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      document.querySelectorAll('.image-card').forEach(c => c.classList.remove('active-selected'));
-      card.classList.add('active-selected');
+      this.app.selectObject(card, 'image');
 
       const parentBoxEl = block.closest('.note-box');
       const parentBox = parentBoxEl ? this.app.findNoteBox(parentBoxEl.dataset.boxId) : null;
@@ -75,9 +77,11 @@ class ImageModule {
     // Floating Tools Bar (Crop, Delete)
     const tools = document.createElement('div');
     tools.className = 'image-tools-bar';
+    tools.contentEditable = 'false';
 
     const cropBtn = document.createElement('button');
     cropBtn.className = 'image-tool-btn';
+    cropBtn.contentEditable = 'false';
     cropBtn.textContent = '✂ Crop';
     cropBtn.onclick = (e) => {
       e.stopPropagation();
@@ -86,6 +90,7 @@ class ImageModule {
 
     const captionBtn = document.createElement('button');
     captionBtn.className = 'image-tool-btn caption-toggle-btn';
+    captionBtn.contentEditable = 'false';
     captionBtn.textContent = captionText ? '💬 Caption' : '💬 + Caption';
     captionBtn.title = 'Add or Remove Caption';
     captionBtn.onclick = (e) => {
@@ -95,6 +100,7 @@ class ImageModule {
 
     const delBtn = document.createElement('button');
     delBtn.className = 'image-tool-btn';
+    delBtn.contentEditable = 'false';
     delBtn.textContent = '× Delete';
     delBtn.onclick = (e) => {
       e.stopPropagation();
@@ -107,43 +113,25 @@ class ImageModule {
 
     container.appendChild(img);
     container.appendChild(tools);
-
-    // Image Resizing via bottom-right drag handle
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'resize-handle se';
-    resizeHandle.style.display = 'block';
-    resizeHandle.style.cursor = 'nwse-resize';
-    container.appendChild(resizeHandle);
-
-    let isResizing = false;
-    let startX = 0;
-    let startW = 0;
-
-    resizeHandle.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      isResizing = true;
-      startX = e.clientX;
-      startW = img.offsetWidth;
-
-      const onMouseMove = (ev) => {
-        if (!isResizing) return;
-        const dx = ev.clientX - startX;
-        const newW = Math.max(120, startW + dx);
-        img.style.width = `${newW}px`;
-      };
-
-      const onMouseUp = () => {
-        isResizing = false;
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
-      };
-
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    });
-
     card.appendChild(container);
+
+    // Universal 8-Point Perimeter Resize Handles
+    this.app.attachUniversalBoundaryHandles(
+      card,
+      (pos, dx, dy, startW) => {
+        let newW = startW;
+        if (pos.includes('e')) newW = Math.max(80, startW + dx);
+        if (pos.includes('w')) newW = Math.max(80, startW - dx);
+        if (pos === 'se' || pos === 'sw' || pos === 'ne' || pos === 'nw') {
+          const scale = Math.max(0.2, (startW + dx) / startW);
+          newW = Math.max(80, startW * scale);
+        }
+        img.style.width = `${Math.round(newW)}px`;
+      },
+      () => {
+        if (this.app.history) this.app.history.pushState('resize_image');
+      }
+    );
 
     // Optional caption locked to image if provided
     if (captionText) {
@@ -185,6 +173,7 @@ class ImageModule {
   createCaptionWrapper(card, captionBtn, text = 'Click to add caption...') {
     const wrapper = document.createElement('div');
     wrapper.className = 'image-caption-wrapper';
+    wrapper.contentEditable = 'false';
 
     const caption = document.createElement('div');
     caption.className = 'image-caption';
@@ -207,6 +196,7 @@ class ImageModule {
 
     const removeBtn = document.createElement('button');
     removeBtn.className = 'caption-remove-btn';
+    removeBtn.contentEditable = 'false';
     removeBtn.title = 'Remove Caption';
     removeBtn.textContent = '×';
     removeBtn.onclick = (e) => {

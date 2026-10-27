@@ -28,6 +28,8 @@
   border-bottom: none;
   border-radius: 3px 3px 0 0;
   font-size: 11px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .table-layout-select {
@@ -38,6 +40,8 @@
   border-radius: 3px;
   background: white;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .table-tool-btn {
@@ -47,6 +51,8 @@
   border: 1px solid #cccccc;
   border-radius: 3px;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .table-tool-btn:hover {
@@ -67,9 +73,46 @@
 
 .canvas-table td, 
 .canvas-table th {
-  padding: 6px 10px;
+  position: relative;
+  padding: 6px 12px;
   min-width: 60px;
   outline: none;
+}
+
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 5px;
+  bottom: 0;
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 5;
+  transition: background 0.12s ease;
+}
+
+.col-resizer:hover,
+.col-resizer.resizing {
+  background: var(--primary-purple, #7719aa);
+}
+
+.row-resizer {
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  right: 0;
+  height: 5px;
+  cursor: row-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 5;
+  transition: background 0.12s ease;
+}
+
+.row-resizer:hover,
+.row-resizer.resizing {
+  background: var(--primary-purple, #7719aa);
 }
 
 /* Layout 1: Classic Grid */
@@ -135,6 +178,55 @@
   color: #ffffff;
 }
 
+/* Table Cell Images */
+.cell-image-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin: 3px 0;
+  vertical-align: middle;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cell-image-wrapper img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  display: block;
+  border-radius: 3px;
+  border: 1px solid #d1d1d1;
+}
+
+.cell-image-del-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.15s ease;
+}
+
+.cell-image-wrapper:hover .cell-image-del-btn {
+  display: flex;
+}
+
+.cell-image-del-btn:hover {
+  background: #d83b01;
+}
+
 /* ==========================================================================
    Image Card & Crop Module
    ========================================================================== */
@@ -178,6 +270,8 @@
   z-index: 50;
   pointer-events: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .image-card:hover .image-tools-bar,
@@ -194,6 +288,8 @@
   padding: 2px 6px;
   cursor: pointer;
   border-radius: 2px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .image-tool-btn:hover {
@@ -234,6 +330,8 @@
   opacity: 0;
   border-radius: 2px;
   transition: opacity 0.15s ease, color 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .image-card:hover .caption-remove-btn,
@@ -371,4 +469,173 @@
 
 .status-sep {
   color: #ccc;
+}
+
+/* ==========================================================================
+   LaTeX & Math Formula Styles
+   ========================================================================== */
+
+.math-block {
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+}
+
+.math-card {
+  position: relative;
+  display: inline-block;
+  background: #fdfcfa;
+  border: 1px solid #e1dfdd;
+  border-radius: 4px;
+  padding: 8px 14px;
+  min-width: 120px;
+  max-width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.math-card:hover {
+  border-color: #b3b0ad;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.math-card.active-selected {
+  border-color: var(--primary-purple);
+  box-shadow: 0 0 0 1px var(--primary-purple);
+}
+
+.math-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  font-size: 16px;
+  color: #201f1e;
+  cursor: pointer;
+}
+
+.math-display math,
+.rendered-math-element {
+  font-family: 'Cambria Math', 'STIX Two Math', 'Segoe UI', serif;
+  font-size: 18px;
+}
+
+.inline-math {
+  display: inline-flex;
+  align-items: center;
+  background: #f3f2f1;
+  border: 1px solid #e1dfdd;
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin: 0 2px;
+  font-family: 'Cambria Math', 'STIX Two Math', 'Segoe UI', serif;
+  font-size: 15px;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: all;
+  transition: background 0.1s ease;
+}
+
+.inline-math:hover {
+  background: #ebe9e7;
+  border-color: var(--primary-purple);
+}
+
+.math-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.math-latex-input {
+  flex: 1;
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 13px;
+  border: 1px solid var(--primary-purple);
+  border-radius: 3px;
+  outline: none;
+}
+
+.math-tools-bar {
+  position: absolute;
+  top: -24px;
+  right: 0;
+  display: none;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 4px;
+  padding: 2px 6px;
+  gap: 4px;
+  z-index: 50;
+  user-select: none;
+}
+
+.math-card:hover .math-tools-bar,
+.math-card.active-selected .math-tools-bar {
+  display: flex;
+}
+
+.math-tool-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.math-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.math-tool-btn.primary {
+  background: var(--primary-purple);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 3px;
+}
+
+.math-tool-btn.danger:hover {
+  background: #a80000;
+}
+
+/* ==========================================================================
+   Rich Headings & Authentic Bullet Lists
+   ========================================================================== */
+
+.note-heading.h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1b1a19;
+  margin: 8px 0 3px 0;
+  line-height: 1.3;
+}
+
+.note-heading.h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: #201f1e;
+  margin: 6px 0 2px 0;
+  line-height: 1.3;
+}
+
+.note-heading.h3, .note-heading.h4, .note-heading.h5, .note-heading.h6 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323130;
+  margin: 5px 0 2px 0;
+  line-height: 1.35;
+}
+
+.list-block ul, .list-block ol,
+.canvas-block ul, .canvas-block ol {
+  margin: 4px 0;
+  padding-left: 22px;
+}
+
+.list-block li, .canvas-block li {
+  margin: 3px 0;
+  line-height: 1.5;
 }

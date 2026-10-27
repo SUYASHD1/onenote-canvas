@@ -74,9 +74,11 @@ class ElementFlowEngine {
       }
     });
 
-    // Mouseup triggers drop
+    // Mouseup triggers drop or selection on click
     window.addEventListener('mouseup', (e) => {
       if (this.pendingDrag) {
+        const clickedBlock = this.pendingDrag.blockEl;
+        this.selectBlock(clickedBlock);
         this.pendingDrag = null;
       }
       if (this.isDragging) {
@@ -276,6 +278,51 @@ class ElementFlowEngine {
     }
     if (this.app.history) {
       this.app.history.pushState('pop_out_item');
+    }
+  }
+
+  /**
+   * Select entire paragraph or object when user clicks on its margin grab handle (:::)
+   */
+  selectBlock(blockEl) {
+    if (!blockEl) return;
+    const parentBoxEl = blockEl.closest('.note-box');
+    if (parentBoxEl) {
+      const box = this.app.findNoteBox(parentBoxEl.dataset.boxId);
+      if (box) this.app.selectNoteBox(box, false);
+    }
+
+    // 1. Text or Heading or List Block: Select entire paragraph text
+    const editable = blockEl.querySelector('[contenteditable="true"]');
+    if (editable) {
+      editable.focus();
+      const range = document.createRange();
+      range.selectNodeContents(editable);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+
+    // 2. Image Card
+    const imgCard = blockEl.querySelector('.image-card');
+    if (imgCard) {
+      this.app.selectObject(imgCard, 'image');
+      return;
+    }
+
+    // 3. Table Wrapper
+    const tableWrapper = blockEl.querySelector('.table-wrapper');
+    if (tableWrapper) {
+      this.app.selectObject(tableWrapper, 'table');
+      return;
+    }
+
+    // 4. Math Card
+    const mathCard = blockEl.querySelector('.math-card');
+    if (mathCard) {
+      this.app.selectObject(mathCard, 'math');
+      return;
     }
   }
 }

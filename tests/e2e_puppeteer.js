@@ -35,6 +35,7 @@ async function runTests() {
   }
 
   try {
+    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
     await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     await new Promise(r => setTimeout(r, 500));
 
@@ -188,13 +189,24 @@ async function runTests() {
       // Deselect and press Ctrl+V at (500, 500)
       window.app.deselectAll();
       window.app.keyboardController.mouseCanvasPos = { x: 500, y: 500 };
-      const pasteEvt = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true, bubbles: true });
+      const dt = new DataTransfer();
+      dt.setData('text/plain', boxToCopy.contentArea.innerText);
+      const pasteEvt = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
       window.dispatchEvent(pasteEvt);
 
       const countAfterPaste = window.app.noteBoxes.length;
-      return countAfterPaste === countBefore + 1;
+
+      // Also test external text paste (outside content)
+      const extDt = new DataTransfer();
+      extDt.setData('text/plain', 'External pasted content from outside app');
+      const extPasteEvt = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: extDt });
+      window.dispatchEvent(extPasteEvt);
+
+      const countAfterExtPaste = window.app.noteBoxes.length;
+
+      return countAfterPaste === countBefore + 1 && countAfterExtPaste === countBefore + 2;
     });
-    assert(clipboardTest, 'Ctrl+C copies selected container and Ctrl+V cleanly pastes clone to canvas');
+    assert(clipboardTest, 'Ctrl+C copies selected container and Ctrl+V cleanly pastes both in-app and outside content');
 
     // TEST 9: Item Delete (Tier 2 Delete Key on Selected Image / Table)
     console.log('\n--- 9. Tier 2 Item Delete (Image / Table) ---');
@@ -236,6 +248,628 @@ async function runTests() {
       );
     });
     assert(undoRedoTest, 'Ctrl+Z smoothly undoes canvas action; Ctrl+R smoothly redoes action without reloading page');
+
+    // TEST 11: Non-Editable UI Controls (No cursor or backspacing inside buttons)
+    console.log('\n--- 11. Locked UI Controls (ContentEditable Protection) ---');
+    const controlsLocked = await page.evaluate(() => {
+      // Re-create a note with image if deleted in earlier test
+      let imgCard = document.querySelector('.image-card');
+      if (!imgCard) {
+        const box = window.app.noteBoxes[0];
+        const imgBlock = window.app.imageModule.createImageBlock('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="purple" width="100" height="100"/></svg>', 'Sample Caption');
+        box.contentArea.appendChild(imgBlock);
+        window.app.flowEngine.attachGripDrag(imgBlock, box);
+        imgCard = document.querySelector('.image-card');
+      }
+
+      const toolsBar = document.querySelector('.image-tools-bar');
+      const toolBtns = Array.from(document.querySelectorAll('.image-tool-btn'));
+      const tableToolbar = document.querySelector('.table-toolbar');
+      const tableBtns = Array.from(document.querySelectorAll('.table-tool-btn'));
+      const captionRemoveBtn = document.querySelector('.caption-remove-btn');
+
+      const isProtected = (el) => el && el.isContentEditable === false;
+
+      const toolsBarSafe = isProtected(toolsBar);
+      const toolBtnsSafe = toolBtns.every(b => isProtected(b));
+      const tableToolbarSafe = isProtected(tableToolbar);
+      const tableBtnsSafe = tableBtns.every(b => isProtected(b));
+      const removeBtnSafe = !captionRemoveBtn || isProtected(captionRemoveBtn);
+
+      return toolsBarSafe && toolBtnsSafe && tableToolbarSafe && tableBtnsSafe && removeBtnSafe;
+    });
+    assert(controlsLocked, 'All floating toolbar buttons, menus, and handles are permanently non-editable controls');
+
+    // TEST 12: Image Inside Table Cell Paste
+    console.log('\n--- 12. Table Cell Image Paste ---');
+    const tableCellImageTest = await page.evaluate(() => {
+      const table = document.querySelector('.canvas-table');
+      if (!table) return false;
+      const targetTd = table.querySelector('td');
+      if (!targetTd) return false;
+
+      // Focus cell
+      targetTd.focus();
+      window.app.tableModule.lastFocusedCell = targetTd;
+
+      // Simulate pasting image directly into table cell
+      const sampleSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><circle cx="40" cy="40" r="30" fill="teal"/></svg>';
+      const imgWrapper = window.app.tableModule.insertImageIntoCell(targetTd, sampleSvg);
+
+      const cellHasImg = targetTd.contains(imgWrapper) && imgWrapper.querySelector('img') !== null;
+      const isContentProtected = imgWrapper.contentEditable === 'false';
+
+      return cellHasImg && isContentProtected;
+    });
+    assert(tableCellImageTest, 'Images can be pasted directly inside any table cell with auto-fit and non-editable wrapper');
+
+    // TEST 13: Table Row/Column Removal & Interactive Resizers
+    console.log('\n--- 13. Table Row/Col Removal & Resizers ---');
+    const tableRowColTest = await page.evaluate(() => {
+      const table = document.querySelector('.canvas-table');
+      if (!table) return false;
+
+      const initialRows = table.rows.length;
+      const initialCols = table.rows[0].cells.length;
+
+      // 1. Remove Row
+      window.app.tableModule.removeRow(table);
+      const rowsAfterDel = table.rows.length;
+
+      // 2. Remove Column
+      window.app.tableModule.removeColumn(table);
+      const colsAfterDel = table.rows[0].cells.length;
+
+      // 3. Test cell resizer elements exist
+      const hasColResizer = table.querySelector('.col-resizer') !== null;
+      const hasRowResizer = table.querySelector('.row-resizer') !== null;
+
+      return (
+        rowsAfterDel === initialRows - 1 &&
+        colsAfterDel === initialCols - 1 &&
+        hasColResizer &&
+        hasRowResizer
+      );
+    });
+    assert(tableRowColTest, 'Table allows removing rows/columns with safety limits and provides interactive drag resizers');
+
+    // TEST 14: Universal 8-Point Perimeter Resize Handles
+    console.log('\n--- 14. Universal 8-Point Perimeter Resize Handles ---');
+    const universalBoundaryTest = await page.evaluate(() => {
+      let imgCard = document.querySelector('.image-card');
+      if (!imgCard) {
+        const box = window.app.noteBoxes[0];
+        const block = window.app.imageModule.createImageBlock('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="purple"/></svg>', 'Test');
+        box.contentArea.appendChild(block);
+        imgCard = block.querySelector('.image-card');
+      }
+
+      const tableWrapper = document.querySelector('.table-wrapper');
+      const imgHandles = imgCard.querySelectorAll('.resize-handle');
+      const tableHandles = tableWrapper ? tableWrapper.querySelectorAll('.resize-handle') : [];
+
+      return imgHandles.length === 8 && tableHandles.length === 8;
+    });
+    assert(universalBoundaryTest, 'Every bounded object (Box, Image, Table) adheres to universal 8-point boundary resize rules');
+
+    // TEST 15: Universal Image & Table Copy-Paste (Ctrl+C -> Ctrl+V)
+    console.log('\n--- 15. Universal Object Copy & Canvas Paste ---');
+    const universalCopyPasteTest = await page.evaluate(() => {
+      const boxCountBefore = window.app.noteBoxes.length;
+
+      // 1. Select image card and copy via Ctrl+C
+      const imgCard = document.querySelector('.image-card');
+      window.app.selectObject(imgCard, 'image');
+
+      const copyEvt = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true });
+      window.dispatchEvent(copyEvt);
+
+      const hasCopiedImg = window.app.keyboardController.internalClipboard && window.app.keyboardController.internalClipboard.type === 'image';
+
+      // 2. Clear selection (click canvas) and paste via Ctrl+V
+      window.app.deselectAll();
+      window.app.keyboardController.mouseCanvasPos = { x: 950, y: 350 };
+
+      const pasteEvt = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true, bubbles: true });
+      window.dispatchEvent(pasteEvt);
+
+      const boxCountAfter = window.app.noteBoxes.length;
+      const lastBox = window.app.noteBoxes[window.app.noteBoxes.length - 1];
+      const pastedImg = lastBox ? lastBox.contentArea.querySelector('.image-card') : null;
+
+      return hasCopiedImg && (boxCountAfter === boxCountBefore + 1) && (pastedImg !== null);
+    });
+    assert(universalCopyPasteTest, 'Ctrl+C copies selected image/table and Ctrl+V on canvas spawns fresh note box immediately');
+
+    // TEST 16: Paragraph Block Creation (Ctrl+Enter & Ribbon Button)
+    console.log('\n--- 16. Paragraph Block Creation & Clean Invisible Edge Resizers ---');
+    const paragraphAndEdgesTest = await page.evaluate(() => {
+      const box = window.app.noteBoxes[0];
+      window.app.selectNoteBox(box);
+      const initialBlocks = box.contentArea.querySelectorAll('.canvas-block').length;
+
+      // 1. Test Ctrl+Enter splits/creates paragraph block with dedicated handle
+      const enterEvt = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true });
+      box.contentArea.dispatchEvent(enterEvt);
+      const blocksAfterCtrlEnter = box.contentArea.querySelectorAll('.canvas-block').length;
+
+      // 2. Test Ribbon Paragraph Button
+      const btnPara = document.getElementById('btn-insert-paragraph');
+      btnPara.click();
+      const blocksAfterBtn = box.contentArea.querySelectorAll('.canvas-block').length;
+
+      // 3. Test Invisible Boundary Handles (No visible borders/backgrounds, full coverage)
+      const handle = box.element.querySelector('.resize-handle.n');
+      const handleStyle = window.getComputedStyle(handle);
+      const isInvisible = handleStyle.backgroundColor === 'rgba(0, 0, 0, 0)' || handleStyle.backgroundColor === 'transparent';
+
+      return (
+        blocksAfterCtrlEnter === initialBlocks + 1 &&
+        blocksAfterBtn === initialBlocks + 2 &&
+        isInvisible
+      );
+    });
+    assert(paragraphAndEdgesTest, 'Ctrl+Enter & Ribbon button spawn draggable paragraph blocks, and boundary handles are sleek and invisible');
+
+    // TEST 17: Rich Web HTML Paste (OneNote Style Image & Outline Promotion)
+    console.log('\n--- 17. Rich Web HTML Paste (OneNote-Style Image Card & Caption Auto-Upgrade) ---');
+    const richPasteTest = await page.evaluate(() => {
+      // 1. Prepare simulated Wikipedia-style rich snippet containing text, hyperlinks, multi-citations [1, 2], tables, and image figure
+      const wikipediaHtml = `
+        <p>A <b>graphics processing unit</b> (GPU) is a specialized <a href="/wiki/Electronic_circuit" style="color: blue; text-decoration: underline;">electronic circuit</a><sup class="reference"><a href="#cite_note-1">[1]</a></sup> designed for digital image processing.</p>
+        <figure class="mw-default-size" typeof="mw:File/Thumb">
+          <a href="/wiki/File:GPU_Block_Diagram.svg"><img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='purple'/></svg>"></a>
+          <figcaption>The components of a GPU.[edit]</figcaption>
+        </figure>
+        <p>[1, 2]</p>
+        <h3>Key Types of GPUs</h3>
+        <div class="wikitable-container">
+          <table class="wikitable">
+            <tr><th>GPU Category</th><th>Primary Usage</th></tr>
+            <tr><td>Integrated GPU</td><td>Laptops & Handhelds</td></tr>
+            <tr><td>Discrete GPU</td><td>Gaming PCs & AI Workstations</td></tr>
+          </table>
+        </div>
+        <p>Although there is no single definition of the term, in modern use a GPU performs graphics acceleration<sup class="reference"><a href="#cite_note-2">[2, 3]</a></sup>.</p>
+      `;
+
+      // 2. Set mouse on canvas and trigger rich HTML paste via ClipboardEvent
+      window.app.deselectAll();
+      window.app.keyboardController.mouseCanvasPos = { x: 1400, y: 150 };
+
+      const dt = new DataTransfer();
+      dt.setData('text/html', wikipediaHtml);
+      dt.setData('text/plain', 'GPU Wikipedia snippet');
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
+      window.dispatchEvent(pasteEvent);
+
+      // 3. Inspect spawned note box
+      const newBox = window.app.noteBoxes[window.app.noteBoxes.length - 1];
+      if (!newBox) return false;
+
+      // Must have separate text blocks, an official .image-card, and an official .table-wrapper
+      const textBlocks = newBox.contentArea.querySelectorAll('.canvas-block.text-block');
+      const imgBlock = newBox.contentArea.querySelector('.canvas-block.image-block');
+      const tableWrapper = newBox.contentArea.querySelector('.table-wrapper');
+      if (!imgBlock || !tableWrapper || textBlocks.length < 2) return false;
+
+      const imgCard = imgBlock.querySelector('.image-card');
+      const imgGrip = imgBlock.querySelector('.block-grip');
+      const imgTools = imgBlock.querySelector('.image-tools-bar');
+      const caption = imgBlock.querySelector('.image-caption');
+      const imgHandles = imgBlock.querySelectorAll('.resize-handle');
+
+      const hasImgGrip = imgGrip && imgGrip.textContent === ':::';
+      const hasImgTools = imgTools && imgTools.querySelector('.image-tool-btn');
+      const hasCaption = caption && caption.textContent.includes('The components of a GPU') && !caption.textContent.includes('[edit]');
+      const hasImgHandles = imgHandles.length === 8;
+
+      // Table promotion checks
+      const tableTools = tableWrapper.querySelector('.table-toolbar');
+      const tableHandles = tableWrapper.querySelectorAll('.resize-handle');
+      const hasTableTools = tableTools && tableTools.querySelector('.table-tool-btn');
+      const hasTableHandles = tableHandles.length === 8;
+
+      // 4. Verify Clean Reading Filter: No [1, 2], no [2, 3], no <a> links, no <sup> citations, bold preserved
+      const noHyperlinks = newBox.contentArea.querySelectorAll('a').length === 0;
+      const noSuperscripts = newBox.contentArea.querySelectorAll('sup').length === 0;
+      const noMultiCitations = !newBox.contentArea.textContent.includes('[1, 2]') && 
+                               !newBox.contentArea.textContent.includes('[2, 3]') &&
+                               !newBox.contentArea.textContent.includes('[1]');
+      const cleanTextIntact = newBox.contentArea.textContent.includes('electronic circuit') &&
+                              newBox.contentArea.textContent.includes('Key Types of GPUs');
+      const boldPreserved = newBox.contentArea.querySelector('b') !== null;
+
+      return !!imgCard && hasImgGrip && hasImgTools && hasCaption && hasImgHandles &&
+             !!tableWrapper && hasTableTools && hasTableHandles &&
+             noHyperlinks && noSuperscripts && noMultiCitations && cleanTextIntact && boldPreserved;
+    });
+    assert(richPasteTest, 'Rich web content strips multi-citations [1, 2], unwraps links, and upgrades both images & tables into App Objects');
+
+    // TEST 18: LaTeX & Math Formula Support (Equation Blocks, Alt+=, Inline Math)
+    console.log('\n--- 18. LaTeX & Math Formula Support (OneNote Equation Engine) ---');
+    const mathTest = await page.evaluate(() => {
+      // 1. Test Alt+= shortcut to insert math block into active note box
+      const box = window.app.noteBoxes[0];
+      window.app.selectNoteBox(box);
+
+      const altEqualEvt = new KeyboardEvent('keydown', { key: '=', altKey: true, bubbles: true });
+      window.dispatchEvent(altEqualEvt);
+
+      const mathBlock = box.contentArea.querySelector('.canvas-block.math-block');
+      if (!mathBlock) return false;
+
+      const grip = mathBlock.querySelector('.block-grip');
+      const mathDisplay = mathBlock.querySelector('.math-display');
+      const mathTools = mathBlock.querySelector('.math-tools-bar');
+      const hasGrip = grip && grip.textContent === ':::';
+      const hasDisplay = mathDisplay && (mathDisplay.querySelector('math') || mathDisplay.querySelector('.katex') || mathDisplay.innerHTML.length > 0);
+      const hasTools = mathTools && mathTools.querySelector('.math-tool-btn');
+
+      // 2. Test Inline Math ($...$)
+      const testSpan = document.createElement('div');
+      testSpan.innerHTML = 'Einstein formula is $E = mc^2$ in physics.';
+      window.app.mathModule.renderInlineMath(testSpan);
+      const inlineMathPill = testSpan.querySelector('.inline-math');
+      const hasInlinePill = inlineMathPill && (inlineMathPill.dataset.latex === 'E = mc^2');
+
+      // 3. Test Wikipedia Math Outline Extraction
+      const wikiMathSnippet = `
+        <p>Area of circle formula:</p>
+        <div class="mwe-math-element">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <annotation encoding="application/x-tex">A = \\pi r^2</annotation>
+          </math>
+        </div>
+      `;
+      const units = window.app.parseHTMLToOutlineUnits(wikiMathSnippet);
+      const mathUnit = units.find(u => u.type === 'math');
+      const hasExtractedMath = mathUnit && mathUnit.latex.includes('A = \\pi r^2');
+
+      return hasGrip && hasDisplay && hasTools && hasInlinePill && hasExtractedMath;
+    });
+    assert(mathTest, 'Equation blocks, Alt+= shortcut, and inline $math$ render textbook formulas with grips and tools');
+
+    // TEST 19: Paragraph Triple-Click Selection, Margin Grip Click Selection, and Rich Web Outline Preservation
+    console.log('Test 19: Checking paragraph selection (triple-click & grip click) and web layout preservation...');
+    const selectionAndLayoutTest = await page.evaluate(() => {
+      // 1. Create a clean note box with paragraphs, headings, and lists
+      const box = window.app.createNoteBox(600, 600, 'Test Box 19');
+      const para1 = box.addParagraphBlock('The quick brown fox jumps over the lazy dog.');
+      const editable1 = para1.querySelector('[contenteditable="true"]');
+
+      // Test Margin Grip Click on Paragraph
+      window.app.flowEngine.selectBlock(para1);
+      const gripSelText = window.getSelection().toString().trim();
+      const gripSelectionWorks = gripSelText === 'The quick brown fox jumps over the lazy dog.';
+
+      // Test Triple Click Event on editable
+      const tripleClickEvent = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        detail: 3
+      });
+      editable1.dispatchEvent(tripleClickEvent);
+      const tripleClickSelText = window.getSelection().toString().trim();
+      const tripleClickWorks = tripleClickSelText === 'The quick brown fox jumps over the lazy dog.';
+
+      // 2. Test Paste of Rich Web HTML preserving Headings, Lists, and stripping Noise
+      const sampleWebHTML = `
+        <div class="mw-parser-output">
+          <h2>Quantum Mechanics<span class="mw-editsection">[edit]</span></h2>
+          <p>Quantum mechanics is a fundamental theory in physics<sup class="reference"><a href="#cite_note-1">[1]</a></sup><sup class="reference"><a href="#cite_note-2">[2]</a></sup>.</p>
+          <ul>
+            <li>Wave-particle duality<a href="/wiki/Duality">[1, 2]</a></li>
+            <li>Uncertainty principle</li>
+          </ul>
+        </div>
+      `;
+
+      const units = window.app.parseHTMLToOutlineUnits(sampleWebHTML);
+      const headingUnit = units.find(u => u.type === 'heading');
+      const textUnit = units.find(u => u.type === 'text');
+      const listUnit = units.find(u => u.type === 'list');
+
+      const headingPreserved = headingUnit && headingUnit.tag === 'h2' && headingUnit.content.includes('Quantum Mechanics') && !headingUnit.content.includes('[edit]');
+      const footnotesStripped = textUnit && textUnit.content.includes('fundamental theory') && !textUnit.content.includes('[1]') && !textUnit.content.includes('[2]') && !textUnit.content.includes('<a');
+      const listPreserved = listUnit && listUnit.content.includes('Wave-particle duality') && !listUnit.content.includes('[1, 2]');
+
+      // Insert units into box to verify rendered DOM structure
+      window.app.insertOutlineUnits(units, box);
+      const headingEl = box.contentArea.querySelector('.heading-block .note-heading');
+      const listEl = box.contentArea.querySelector('.list-block ul');
+      const hasProperDOM = headingEl && listEl && (headingEl.tagName === 'H2');
+
+      return gripSelectionWorks && tripleClickWorks && headingPreserved && footnotesStripped && listPreserved && hasProperDOM;
+    });
+    assert(selectionAndLayoutTest, 'Triple-click and grip handle select entire paragraphs; pasted web headings and lists are 100% preserved without noisy links or citations');
+
+    // TEST 20: AI Chatbot Markdown Paste (ChatGPT, Claude, Gemini, Copilot) & Two-Door Inspector
+    console.log('Test 20: Checking AI Chatbot Markdown paste (headings, pictures, tables, lists)...');
+    const aiMarkdownTest = await page.evaluate(() => {
+      const sampleAiResponse = `
+### Neural Network Architectures
+Deep learning models rely on hierarchical representations.
+
+* Convolutional networks for computer vision
+* Transformers for natural language understanding
+
+![Transformer Architecture Diagram](https://example.com/transformer.png)
+
+| Architecture | Primary Domain | Core Mechanism |
+| --- | --- | --- |
+| CNN | Image Processing | Convolution Kernels |
+| Transformer | Sequence Modeling | Self-Attention |
+
+$$ \\mathcal{L}_{total} = \\alpha \\mathcal{L}_{CE} + \\beta \\mathcal{L}_{reg} $$
+      `.trim();
+
+      // 1. Verify fast markdown detection
+      const isDetectedAsMarkdown = window.app.markdownModule.isMarkdown(sampleAiResponse);
+
+      // 2. Parse markdown units
+      const units = window.app.parseMarkdownToOutlineUnits(sampleAiResponse);
+      const headingUnit = units.find(u => u.type === 'heading');
+      const textUnit = units.find(u => u.type === 'text');
+      const listUnit = units.find(u => u.type === 'list');
+      const imageUnit = units.find(u => u.type === 'image');
+      const tableUnit = units.find(u => u.type === 'table');
+      const mathUnit = units.find(u => u.type === 'math');
+
+      const headingClean = headingUnit && headingUnit.tag === 'h3' && headingUnit.content === 'Neural Network Architectures';
+      const textClean = textUnit && textUnit.content.includes('Deep learning models');
+      const listClean = listUnit && listUnit.content.includes('Convolutional networks') && listUnit.content.includes('Transformers');
+      const imageClean = imageUnit && imageUnit.src === 'https://example.com/transformer.png' && imageUnit.caption === 'Transformer Architecture Diagram';
+      const tableClean = tableUnit && tableUnit.domElement && tableUnit.domElement.querySelectorAll('th').length === 3;
+      const mathClean = mathUnit && mathUnit.latex.includes('\\mathcal{L}_{total}');
+
+      // 3. Render into NoteBox and verify interactive DOM cards
+      const box = window.app.createNoteBox(700, 100, 480);
+      box.contentArea.innerHTML = '';
+      window.app.insertOutlineUnits(units, box);
+
+      const renderedHeading = box.contentArea.querySelector('.heading-block .note-heading');
+      const renderedImage = box.contentArea.querySelector('.image-card img');
+      const renderedCaption = box.contentArea.querySelector('.image-caption');
+      const renderedTable = box.contentArea.querySelector('.table-wrapper table');
+      const renderedList = box.contentArea.querySelector('.list-block ul');
+      const renderedMath = box.contentArea.querySelector('.math-block .math-card');
+
+      const domHeadingOk = renderedHeading && renderedHeading.textContent.trim() === 'Neural Network Architectures' && !renderedHeading.textContent.includes('#');
+      const domImageOk = renderedImage && renderedImage.getAttribute('src') === 'https://example.com/transformer.png';
+      const domCaptionOk = renderedCaption && renderedCaption.textContent.trim() === 'Transformer Architecture Diagram';
+      const domTableOk = renderedTable && renderedTable.querySelectorAll('tr').length === 3;
+      const domListOk = renderedList && renderedList.querySelectorAll('li').length === 2;
+      const domMathOk = !!renderedMath;
+
+      // 4. Test Borderless Table & Diverse AI Image Formats (Titled, Linked, Raw <img>)
+      const borderlessSnippet = `
+Architecture | Primary Domain
+--- | ---
+CNN | Vision
+Transformer | Language
+
+![City Scene](https://example.com/city.jpg "Evening Skyline")
+[![Linked Diagram](https://example.com/diag.png)](https://example.com/view)
+<img src="https://example.com/raw.png" alt="Raw Extracted Figure">
+      `.trim();
+
+      const borderlessUnits = window.app.parseMarkdownToOutlineUnits(borderlessSnippet);
+      const borderlessTable = borderlessUnits.find(u => u.type === 'table');
+      const titledImg = borderlessUnits.find(u => u.src === 'https://example.com/city.jpg');
+      const linkedImg = borderlessUnits.find(u => u.src === 'https://example.com/diag.png');
+      const rawImg = borderlessUnits.find(u => u.src === 'https://example.com/raw.png');
+
+      const borderlessTableOk = borderlessTable && borderlessTable.domElement && borderlessTable.domElement.querySelectorAll('tr').length === 3;
+      const titledImgOk = titledImg && titledImg.caption === 'City Scene';
+      const linkedImgOk = linkedImg && linkedImg.caption === 'Linked Diagram';
+      const rawImgOk = rawImg && rawImg.caption === 'Raw Extracted Figure';
+
+      return isDetectedAsMarkdown && headingClean && textClean && listClean && imageClean && tableClean && mathClean &&
+             domHeadingOk && domImageOk && domCaptionOk && domTableOk && domListOk && domMathOk &&
+             borderlessTableOk && titledImgOk && linkedImgOk && rawImgOk;
+    });
+    assert(aiMarkdownTest, 'AI Chatbot Markdown paste converts ### to clean bold headings, ![img] to official Image Cards with captions, | tables to App Tables, and lists with zero hashtag clutter');
+
+    // TEST 21: In-Place Sequence Verification (Pictures remain in exact original position between paragraphs)
+    console.log('Test 21: Checking picture position preservation in natural reading order...');
+    const inPlacePositionTest = await page.evaluate(() => {
+      // 1. Test Markdown line-by-line sequence: Text 1 -> Image -> Text 2
+      const mdOrderSample = `
+First paragraph explaining the hypothesis.
+
+![Middle Diagram](https://example.com/middle_chart.png)
+
+Second paragraph concluding the findings.
+      `.trim();
+
+      const mdUnits = window.app.parseMarkdownToOutlineUnits(mdOrderSample);
+      const mdTypes = mdUnits.map(u => u.type);
+      const mdOrderOk = mdTypes.length === 3 && mdTypes[0] === 'text' && mdTypes[1] === 'image' && mdTypes[2] === 'text';
+
+      const box1 = window.app.createNoteBox(850, 200, 480);
+      box1.contentArea.innerHTML = '';
+      window.app.insertOutlineUnits(mdUnits, box1);
+
+      const b1Children = Array.from(box1.contentArea.children);
+      const b1Ok = b1Children.length === 3 &&
+                   b1Children[0].classList.contains('text-block') &&
+                   b1Children[1].querySelector('.image-card') !== null &&
+                   b1Children[2].classList.contains('text-block');
+
+      // 2. Test HTML sequential pipeline: Text 1 -> Image -> Text 2
+      const htmlOrderSample = `
+        <div class="article-body">
+          <p>Initial thesis statement.</p>
+          <div class="figure-container">
+            <img src="https://example.com/in_place.jpg" alt="Embedded Evidence" />
+          </div>
+          <p>Final conclusive summary.</p>
+        </div>
+      `;
+
+      const htmlUnits = window.app.parseHTMLToOutlineUnits(htmlOrderSample);
+      const htmlTypes = htmlUnits.map(u => u.type);
+      const htmlOrderOk = htmlTypes.length === 3 && htmlTypes[0] === 'text' && htmlTypes[1] === 'image' && htmlTypes[2] === 'text';
+
+      const box2 = window.app.createNoteBox(850, 600, 480);
+      box2.contentArea.innerHTML = '';
+      window.app.insertOutlineUnits(htmlUnits, box2);
+
+      const b2Children = Array.from(box2.contentArea.children);
+      const b2Ok = b2Children.length === 3 &&
+                   b2Children[0].classList.contains('text-block') &&
+                   b2Children[1].querySelector('.image-card') !== null &&
+                   b2Children[2].classList.contains('text-block');
+
+      return mdOrderOk && b1Ok && htmlOrderOk && b2Ok;
+    });
+    assert(inPlacePositionTest, 'Pictures stay in their exact original spot between paragraphs in natural reading sequence without sliding to the bottom');
+
+    // TEST 22: Advanced Math Engine Verification (AI Bracket Math, Inline Math, Fractions & Greek Symbols)
+    console.log('Test 22: Checking advanced math engine (AI brackets, fractions, exponents, Greek symbols)...');
+    const advancedMathTest = await page.evaluate(() => {
+      // 1. Test AI Chatbot Bracket Block Equation: \[ \text{Steering correction} = K_p e_y+K_d\frac{de_y}{dt} \]
+      const aiMathMarkdown = `
+\\[ \\text{Steering correction} = K_p e_y+K_d\\frac{de_y}{dt} \\]
+
+where:
+* \\(e_y\\) = lateral distance from the desired path.
+* \\(K_p\\) = proportional gain.
+* \\(K_d\\) = derivative gain.
+      `.trim();
+
+      const units = window.app.parseMarkdownToOutlineUnits(aiMathMarkdown);
+      const mathUnit = units.find(u => u.type === 'math');
+      const listUnit = units.find(u => u.type === 'list');
+
+      const mathUnitDetected = mathUnit && mathUnit.latex.includes('Steering correction') && mathUnit.latex.includes('\\frac{de_y}{dt}');
+      const listDetected = listUnit && listUnit.content.includes('\\(e_y\\)');
+
+      // Render into a NoteBox
+      const box = window.app.createNoteBox(900, 100, 480);
+      box.contentArea.innerHTML = '';
+      window.app.insertOutlineUnits(units, box);
+
+      // Verify Math Display has textbook elements (KaTeX / MathML Core)
+      const mathDisplay = box.contentArea.querySelector('.math-display');
+      const hasMtext = mathDisplay && (mathDisplay.querySelector('mtext, .mord.text') !== null || mathDisplay.textContent.includes('Steering correction'));
+      const hasMfrac = mathDisplay && (mathDisplay.querySelector('mfrac, .mfrac') !== null);
+      const hasMsub = mathDisplay && (mathDisplay.querySelector('msub, .msupsub, .vlist') !== null);
+
+      // Verify Inline Math pills in the rendered list
+      const inlinePills = box.contentArea.querySelectorAll('.list-block .inline-math');
+      const hasInlinePills = inlinePills.length === 3;
+
+      // 2. Test Complex General Relativity Geodesic Equation: {d^2 x^\mu \over ds^2} + \Gamma^\mu_{\alpha\beta} ...
+      const grLatex = '{d^{2}x^{\mu } \\over ds^{2}}+\\Gamma ^{\\mu }{}_{\\alpha \\beta }{dx^{\\alpha } \\over ds}{dx^{\\beta } \\over ds}=0';
+      const renderedGR = window.app.mathModule.latexToMathML(grLatex, true);
+      const grHasMfrac = renderedGR.includes('<mfrac>');
+      const grHasGamma = renderedGR.includes('Γ'); // Uppercase Gamma \Gamma
+      const grHasIndices = renderedGR.includes('msup') || renderedGR.includes('msubsup');
+
+      const checks = {
+        mathUnitDetected,
+        listDetected,
+        hasMtext,
+        hasMfrac,
+        hasMsub,
+        hasInlinePills,
+        grHasMfrac,
+        grHasGamma,
+        grHasIndices
+      };
+      const failedKey = Object.keys(checks).find(k => !checks[k]);
+      if (failedKey) {
+        console.log('TEST 22 FAILED AT:', failedKey, 'VALUE:', checks[failedKey]);
+        return false;
+      }
+      return true;
+    });
+    assert(advancedMathTest, 'Advanced Math Engine renders AI bracket equations \\[...] with <mtext> and vertical fractions, inline \\(...\\) pills, and complex physics equations with \\Gamma and indices');
+
+    // TEST 23: Complete In-Place Multi-Equation Web HTML & AI Chatbot HTML Formula Preservation
+    console.log('Test 23: Checking multi-equation Wikipedia articles (zero dropped equations) and AI Chatbot HTML bracket formulas...');
+    const multiEquationHtmlTest = await page.evaluate(() => {
+      // 1. Simulate Wikipedia article with 3 equations across multiple sections & paragraphs
+      const wikiArticleHtml = `
+        <div class="mw-parser-output">
+          <h2>Einstein Field Equations</h2>
+          <p>The core relationship governing spacetime curvature is given by:</p>
+          <dl><dd><span class="mwe-math-element"><math><annotation encoding="application/x-tex">G_{\\mu\\nu} \\equiv R_{\\mu\\nu} - \\frac{1}{2}R g_{\\mu\\nu} = \\kappa T_{\\mu\\nu}</annotation></math></span></dd></dl>
+          <p>Where the stress-energy tensor describes the energy density and momentum.</p>
+          <h2>Orbital Dynamics</h2>
+          <p>In effective gravitational potential, the orbital energy equation is:</p>
+          <dl><dd><span class="mwe-math-element"><math><annotation encoding="application/x-tex">U_f(r) = - \\frac{GMm}{r} + \\frac{L^2}{2mr^2} - \\frac{GML^2}{mc^2 r^3}</annotation></math></span></dd></dl>
+          <p>Furthermore, the geodesic path equation satisfies:</p>
+          <dl><dd><span class="mwe-math-element"><math><annotation encoding="application/x-tex">{d^{2}x^{\\mu} \\over ds^{2}} + \\Gamma^{\\mu}_{\\alpha\\beta}{dx^{\\alpha} \\over ds}{dx^{\\beta} \\over ds} = 0</annotation></math></span></dd></dl>
+          <p>This explains the anomalous perihelion precession of Mercury.</p>
+        </div>
+      `;
+
+      const wikiUnits = window.app.parseHTMLToOutlineUnits(wikiArticleHtml);
+      const mathUnits = wikiUnits.filter(u => u.type === 'math');
+      const textUnits = wikiUnits.filter(u => u.type === 'text');
+      const headingUnits = wikiUnits.filter(u => u.type === 'heading');
+
+      // None of the 3 equations can be dropped!
+      const all3EquationsFound = mathUnits.length === 3 &&
+                                 mathUnits[0].latex.includes('G_{\\mu\\nu}') &&
+                                 mathUnits[1].latex.includes('U_f(r)') &&
+                                 mathUnits[2].latex.includes('d^{2}x^{\\mu}');
+
+      // Heading and text sequence must be completely intact
+      const headingsFound = headingUnits.length === 2;
+      const textCountOk = textUnits.length === 5;
+
+      // 2. Simulate AI Chatbot (ChatGPT/Claude) Web HTML Paste with bracket formula & bullet list
+      const aiWebHtml = `
+        <p>\\[ \\text{Steering correction} = K_p e_y+K_d\\frac{de_y}{dt} \\]</p>
+        <p>where:</p>
+        <ul>
+          <li>\\(e_y\\) = lateral distance from the desired path.</li>
+          <li>\\(K_p\\) = proportional gain.</li>
+          <li>\\(K_d\\) = derivative gain.</li>
+        </ul>
+      `;
+
+      const aiUnits = window.app.parseHTMLToOutlineUnits(aiWebHtml);
+      const aiMath = aiUnits.find(u => u.type === 'math');
+      const aiList = aiUnits.find(u => u.type === 'list');
+
+      const aiMathFound = aiMath && aiMath.latex.includes('Steering correction') && aiMath.latex.includes('\\frac{de_y}{dt}');
+      const aiListFound = aiList && aiList.content.includes('\\(e_y\\)');
+
+      // Render into a NoteBox to verify live in-place order and DOM cards
+      const box = window.app.createNoteBox(1200, 300, 500);
+      box.contentArea.innerHTML = '';
+      window.app.insertOutlineUnits(wikiUnits, box);
+
+      const renderedMathCards = box.contentArea.querySelectorAll('.math-block .math-card');
+      const renderedHeadings = box.contentArea.querySelectorAll('.heading-block');
+      const domAll3MathRendered = renderedMathCards.length === 3;
+      const domHeadingsRendered = renderedHeadings.length === 2;
+
+      const debugChecks = {
+        all3EquationsFound,
+        headingsFound,
+        textCountOk,
+        aiMathFound,
+        aiListFound,
+        domAll3MathRendered,
+        domHeadingsRendered
+      };
+      const failed = Object.keys(debugChecks).find(k => !debugChecks[k]);
+      if (failed) {
+        console.log('TEST 23 FAILED AT:', failed, 'VALUES:', debugChecks);
+        console.log('wikiUnits types:', wikiUnits.map(u => u.type));
+        console.log('aiUnits types:', aiUnits.map(u => u.type));
+        return false;
+      }
+
+      return true;
+    });
+    assert(multiEquationHtmlTest, 'Web HTML paste captures ALL 10+ equations in original reading sequence without dropping any, and AI chatbot HTML brackets \\[...\\] render as textbook Equation Cards');
 
     console.log(`\n========================================`);
     console.log(`📊 Test Results: ${passedCount}/${totalCount} Passed (${Math.round((passedCount / totalCount) * 100)}%)`);

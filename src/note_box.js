@@ -43,9 +43,11 @@ class NoteBox {
     // Top Move Header Bar
     const header = document.createElement('div');
     header.className = 'note-header';
+    header.contentEditable = 'false';
 
     const moveHandle = document.createElement('div');
     moveHandle.className = 'note-move-handle';
+    moveHandle.contentEditable = 'false';
     moveHandle.title = 'Drag to move note container';
     moveHandle.innerHTML = `
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -57,6 +59,7 @@ class NoteBox {
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'note-close-btn';
+    closeBtn.contentEditable = 'false';
     closeBtn.title = 'Delete Note Box';
     closeBtn.innerHTML = '×';
     closeBtn.onclick = (e) => {
@@ -81,6 +84,7 @@ class NoteBox {
       const handle = document.createElement('div');
       handle.className = `resize-handle ${pos}`;
       handle.dataset.position = pos;
+      handle.contentEditable = 'false';
       box.appendChild(handle);
     });
 
@@ -99,23 +103,62 @@ class NoteBox {
       this.app.selectNoteBox(this, false); // select without border outline to type freely
     });
 
+    // 3-Click Rapid Paragraph Selection (Triple-click selects entire paragraph block)
+    content.addEventListener('click', (e) => {
+      if (e.detail === 3) {
+        const editable = e.target.closest('.canvas-block [contenteditable="true"]');
+        if (editable) {
+          e.preventDefault();
+          const range = document.createRange();
+          range.selectNodeContents(editable);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    });
+
     content.addEventListener('input', () => {
+      this.upgradeStrayImages();
+      this.upgradeStrayTables();
       if (this.app.history) {
         this.app.history.debouncePush('edit_text');
       }
     });
 
-    // Content typing watcher for keyboard triggers (Tab table detection)
+    // Content typing watcher for keyboard triggers (Tab table detection & Ctrl+Enter paragraph block split)
     content.addEventListener('keydown', (e) => {
       const selection = window.getSelection();
-      const currentBlock = selection.anchorNode?.parentElement?.closest('.canvas-block');
+      let currentBlock = selection.anchorNode?.parentElement?.closest('.canvas-block');
+      if (!currentBlock && e.target && e.target.closest) {
+        currentBlock = e.target.closest('.canvas-block');
+      }
+
+      // Ctrl + Enter: Split / create a brand-new draggable paragraph block with its own ::: handle!
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const newBlock = this.insertTextBlockAfter(currentBlock, '');
+        const editable = newBlock.querySelector('[contenteditable="true"]');
+        if (editable) {
+          editable.focus();
+        }
+        if (this.app.history) {
+          this.app.history.pushState('split_paragraph');
+        }
+        return;
+      }
+
       if (this.app.tableModule.handleKeyDown(e, currentBlock)) {
         return;
       }
     });
 
-    // Paste handler for Excel/Tables
+    // Paste handler for Excel/Tables & safety check
     content.addEventListener('paste', (e) => {
+      setTimeout(() => {
+        this.upgradeStrayImages();
+        this.upgradeStrayTables();
+      }, 0);
       const selection = window.getSelection();
       const currentBlock = selection.anchorNode?.parentElement?.closest('.canvas-block');
       if (this.app.tableModule.handlePaste(e, currentBlock)) {
@@ -128,15 +171,107 @@ class NoteBox {
   }
 
   /**
-   * Add a text paragraph block with hover grip
+   * Trigger a gentle visual pulse animation on a block
    */
-  addTextBlock(text = '', isHeading = false) {
+  pulseBlock(block) {
+    if (!block) return;
+    block.classList.remove('block-spawn-pulse');
+    void block.offsetWidth; // Force reflow
+    block.classList.add('block-spawn-pulse');
+    setTimeout(() => block.classList.remove('block-spawn-pulse'), 600);
+  }
+
+  /**
+   * Insert a text paragraph block after a specific block
+   */
+  insertTextBlockAfter(afterBlock, text = '', pulse = true) {
     const block = document.createElement('div');
     block.className = 'canvas-block text-block';
     block.dataset.blockType = 'text';
 
     const grip = document.createElement('div');
     grip.className = 'block-grip';
+    grip.contentEditable = 'false';
+    grip.textContent = ':::';
+    grip.title = 'Drag to rearrange or drag out to detach';
+    block.appendChild(grip);
+
+    const span = document.createElement('div');
+    span.contentEditable = 'true';
+    span.innerHTML = text || '<br>';
+    block.appendChild(span);
+
+    if (afterBlock && afterBlock.nextSibling) {
+      this.contentArea.insertBefore(block, afterBlock.nextSibling);
+    } else {
+      this.contentArea.appendChild(block);
+    }
+
+    this.app.flowEngine.attachGripDrag(block, this);
+
+    if (pulse) {
+      this.pulseBlock(block);
+    }
+
+    return block;
+  }
+
+  /**
+   * Promotes any unmanaged, naked <img> elements pasted into text blocks into full App Image Cards
+   */
+  upgradeStrayImages() {
+    const strayImgs = this.contentArea.querySelectorAll('.text-block [contenteditable="true"] img:not(.canvas-image):not(.cell-image-preview)');
+    if (strayImgs.length === 0) return;
+
+    strayImgs.forEach(img => {
+      const parentBlock = img.closest('.canvas-block');
+      let src = img.getAttribute('src');
+      if (src && src.startsWith('//')) src = 'https:' + src;
+      const caption = img.getAttribute('alt') || img.getAttribute('title') || '';
+      if (src && !src.includes('spacer.gif')) {
+        const imgBlock = this.app.imageModule.createImageBlock(src, caption);
+        if (parentBlock && parentBlock.nextSibling) {
+          this.contentArea.insertBefore(imgBlock, parentBlock.nextSibling);
+        } else {
+          this.contentArea.appendChild(imgBlock);
+        }
+        this.app.flowEngine.attachGripDrag(imgBlock, this);
+      }
+      img.remove();
+    });
+  }
+
+  /**
+   * Promotes any unmanaged, naked <table> elements pasted into text blocks into full App Table Objects
+   */
+  upgradeStrayTables() {
+    const strayTables = this.contentArea.querySelectorAll('.text-block [contenteditable="true"] table:not(.onenote-table)');
+    if (strayTables.length === 0) return;
+
+    strayTables.forEach(table => {
+      const parentBlock = table.closest('.canvas-block');
+      const tableBlock = this.app.tableModule.createTableFromDOM(table);
+      if (parentBlock && parentBlock.nextSibling) {
+        this.contentArea.insertBefore(tableBlock, parentBlock.nextSibling);
+      } else {
+        this.contentArea.appendChild(tableBlock);
+      }
+      this.app.flowEngine.attachGripDrag(tableBlock, this);
+      table.remove();
+    });
+  }
+
+  /**
+   * Add a text paragraph block with hover grip
+   */
+  addTextBlock(text = '', isHeading = false, pulse = false) {
+    const block = document.createElement('div');
+    block.className = 'canvas-block text-block';
+    block.dataset.blockType = 'text';
+
+    const grip = document.createElement('div');
+    grip.className = 'block-grip';
+    grip.contentEditable = 'false';
     grip.textContent = ':::';
     grip.title = 'Drag to rearrange or drag out to detach';
     block.appendChild(grip);
@@ -154,7 +289,16 @@ class NoteBox {
 
     this.contentArea.appendChild(block);
     this.app.flowEngine.attachGripDrag(block, this);
+
+    if (pulse) {
+      this.pulseBlock(block);
+    }
+
     return block;
+  }
+
+  addParagraphBlock(text = '', pulse = false) {
+    return this.addTextBlock(text, false, pulse);
   }
 
   /**
@@ -167,12 +311,14 @@ class NoteBox {
 
     const grip = document.createElement('div');
     grip.className = 'block-grip';
+    grip.contentEditable = 'false';
     grip.textContent = ':::';
     block.appendChild(grip);
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'todo-checkbox';
+    checkbox.contentEditable = 'false';
     checkbox.checked = checked;
     block.appendChild(checkbox);
 

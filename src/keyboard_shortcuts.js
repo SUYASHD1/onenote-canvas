@@ -537,6 +537,20 @@ class KeyboardController {
 
       if (textData.trim().length > 0) {
         e.preventDefault();
+        // Auto-detect spreadsheet tab-separated data (TSV) or CSV on empty canvas paste
+        if (textData.includes('\t') || (textData.includes(',') && textData.includes('\n'))) {
+          const rows = textData.trim().split(/\r?\n/).map(r => textData.includes('\t') ? r.split('\t') : r.split(','));
+          if (rows.length >= 1 && rows[0].length >= 2) {
+            const newBox = this.app.createNoteBox(this.mouseCanvasPos.x, this.mouseCanvasPos.y, 440);
+            newBox.contentArea.innerHTML = '';
+            const tableBlock = this.app.tableModule.createTableFromData(rows);
+            newBox.contentArea.appendChild(tableBlock);
+            this.app.flowEngine.attachGripDrag(tableBlock, newBox);
+            if (this.app.history) this.app.history.pushState('paste_table');
+            return;
+          }
+        }
+
         const newBox = this.app.createNoteBox(this.mouseCanvasPos.x, this.mouseCanvasPos.y);
         newBox.contentArea.innerHTML = '';
         const lines = textData.trim().split(/\r?\n/).filter(l => l.trim().length > 0);

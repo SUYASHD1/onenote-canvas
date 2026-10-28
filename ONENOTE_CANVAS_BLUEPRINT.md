@@ -1,32 +1,36 @@
 # 🗺️ OneNote Spatial Canvas — Complete Architecture Blueprint & Knowledge Base
 
-> **System Status:** Production Ready & Verified (28/28 Automated E2E Tests Passing — 100%)  
-> **Core Philosophy:** A pure, zero-compromise spatial note-taking web application inspired by **Microsoft OneNote**. Features an anchored auto-growing canvas, draggable margin grips with pop-out/pop-in flow, instant table creation with 4 layout themes, built-in image cropping, and a universal AI/Web Math Engine capable of capturing and rendering any formula with textbook perfection.
+> **System Status:** Production Ready & Verified (50/50 Automated E2E Tests Passing — 100%)  
+> **Core Philosophy:** A pure, zero-compromise spatial note-taking web application inspired by **Microsoft OneNote**. Features an anchored auto-growing canvas, draggable margin grips with pop-out/pop-in flow, instant table creation with 4 layout themes, built-in image cropping, a universal AI/Web Math Engine, 3-tier notebook hierarchy, multi-store IndexedDB vault, smart cursor-inspecting ribbon, and pressure-sensitive digital inking.
 
 ---
 
 ## 🏛️ 1. System Architecture & Component Map
 
-The codebase is built strictly on modular, decoupled Vanilla JavaScript (ES6+) and CSS, maintaining clean separation of concerns with files structured around ~350–500 lines for maximum maintainability:
+The codebase is built strictly on modular, decoupled Vanilla JavaScript (ES6+) and CSS, maintaining clean separation of concerns with files structured around ~350 lines for maximum maintainability:
 
 ```
 Canvas/
-├── index.html                   <-- Structure: App header, Ribbon toolbar, Spatial Canvas, Crop modal (~175 lines)
-├── styles.css                   <-- Design System: Ribbon styles, canvas grid, note box frame, resize handles (~420 lines)
+├── index.html                   <-- Structure: App header, Smart Ribbon, 2-Column Sidebar, Canvas, Modals (~380 lines)
+├── styles.css                   <-- Design System: Ribbon, light theme sidebar, ghost scrollbars, inking layers (~1200 lines)
 ├── components.css               <-- Object Styles: 4 Table layouts, Image Cards, Equation Cards, Math pills (~440 lines)
 ├── src/
-│   ├── app.js                   <-- Master coordinator, Ribbon actions, universal HTML outline parser (~770 lines)
-│   ├── canvas.js                <-- Anchored canvas, elastic auto-growth, pan & zoom, double-click spawn (~190 lines)
+│   ├── app.js                   <-- Master coordinator, Ribbon actions, universal HTML outline parser (~790 lines)
+│   ├── canvas.js                <-- Anchored canvas, zero-drift zoom, kinetic coasting, marquee select (~340 lines)
 │   ├── note_box.js              <-- Container lifecycle, header drag, 8-point resize, selection state (~475 lines)
 │   ├── element_flow.js          <-- Margin hover grips (:::), Pop-Out detaching, Pop-In blue drop guideline (~330 lines)
 │   ├── table_module.js          <-- Word+Tab auto-detection, 4 layout styles, row/col add/remove/resize (~510 lines)
 │   ├── image_module.js          <-- 8-handle perimeter scaling, canvas crop tool, caption locking (~400 lines)
 │   ├── keyboard_shortcuts.js    <-- 3-tier keyboard controller, Alt+Shift arrows, clipboard paste pipeline (~660 lines)
-│   ├── history_manager.js       <-- Unified undo/redo snapshot stack with debouncing (~220 lines)
+│   ├── history_manager.js       <-- Unified undo/redo snapshot stack, debouncing, stroke serialization (~230 lines)
+│   ├── sidebar.js               <-- 3-Tier hierarchy: Notebooks, Sections, Pages, clean blank guarantee (~595 lines)
+│   ├── storage_vault.js         <-- Multi-gigabyte 4-store IndexedDB, safe-lock, .notes backup export/import (~400 lines)
+│   ├── ribbon_controller.js     <-- Two-Way Mirror cursor inspection, 2-in-1 split color tools, selection lock (~312 lines)
+│   ├── ink_engine.js            <-- Floating mode puck, pressure pen, under-text highlighter, shape snapping (~340 lines)
 │   ├── markdown_module.js       <-- AI Chatbot Markdown parser (headings, tables, images, block math) (~340 lines)
 │   └── math_module.js           <-- Universal Math Engine: KaTeX rendering & native MathML Core fallback (~465 lines)
 └── tests/
-    └── e2e_puppeteer.js         <-- 28-capability automated browser test suite (Microsoft Edge driver) (~885 lines)
+    └── e2e_puppeteer.js         <-- 50-capability automated browser test suite (Microsoft Edge driver) (~1450 lines)
 ```
 
 ---

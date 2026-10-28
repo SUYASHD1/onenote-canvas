@@ -353,8 +353,18 @@ class NoteBox {
       isDragging = true;
       startClientX = e.clientX;
       startClientY = e.clientY;
-      startBoxX = this.x;
-      startBoxY = this.y;
+
+      const isMulti = this.element.classList.contains('multi-selected');
+      const boxesToMove = isMulti
+        ? this.app.noteBoxes.filter(b => b.element.classList.contains('multi-selected') || b === this)
+        : [this];
+
+      const startPositions = boxesToMove.map(b => ({
+        box: b,
+        startX: b.x,
+        startY: b.y
+      }));
+
       e.preventDefault();
 
       const onMouseMove = (ev) => {
@@ -363,12 +373,12 @@ class NoteBox {
         const dx = (ev.clientX - startClientX) / zoom;
         const dy = (ev.clientY - startClientY) / zoom;
 
-        // Origin (0,0) protection: prevent dragging past top or left boundary
-        this.x = Math.max(10, Math.round(startBoxX + dx));
-        this.y = Math.max(10, Math.round(startBoxY + dy));
-
-        this.element.style.left = `${this.x}px`;
-        this.element.style.top = `${this.y}px`;
+        startPositions.forEach(item => {
+          item.box.x = Math.max(10, Math.round(item.startX + dx));
+          item.box.y = Math.max(10, Math.round(item.startY + dy));
+          item.box.element.style.left = `${item.box.x}px`;
+          item.box.element.style.top = `${item.box.y}px`;
+        });
 
         // Check if canvas stage needs to grow down or right
         this.app.canvas.ensureBounds(this.app.noteBoxes);

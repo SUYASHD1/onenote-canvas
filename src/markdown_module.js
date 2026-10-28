@@ -27,8 +27,9 @@ class MarkdownModule {
     // 1. Markdown headings: # Title, ## Section, ### Sub-section
     if (/(^|\n)\s*#{1,6}\s+\S/m.test(trimmed)) return true;
 
-    // 2. Markdown image: ![alt](url) or [![alt](url)](link) or <img ...>
+    // 2. Markdown image: ![alt](url) or [![alt](url)](link) or <img ...> or unflagged [alt](image_url)
     if (/!\[([^\]]*)\]\(\s*([^\s)"']+)/.test(trimmed)) return true;
+    if (/\[([^\]]*)\]\(\s*(https?:\/\/[^\s)"']*(?:images\.openai\.com|\.(?:png|jpe?g|webp|gif|svg|bmp|avif)|purpose=inline)[^\s)"']*)\)/i.test(trimmed)) return true;
 
     // 3. Markdown table: any line with pipe followed by separator row with - and |
     if (/(^|\n)\s*\|?.+\|.+\n\s*\|?[\s\-:]+\|[\s\-:]*\|?/m.test(trimmed)) return true;
@@ -40,7 +41,16 @@ class MarkdownModule {
     if (/(^|\n)\s*(?:\$\$|\\\[|\\begin\{(?:equation|align)\})/.test(trimmed)) return true;
     if (/\\\([^\)]+\\\)/.test(trimmed)) return true;
 
-    // 6. Multiple bullet lines or numbered list lines
+    // 6. Blockquote or callouts: > note
+    if (/(^|\n)\s*>\s+\S/.test(trimmed)) return true;
+
+    // 7. Task lists: - [ ] or - [x]
+    if (/(^|\n)\s*[-*+]\s+\[[ xX]\]\s+\S/.test(trimmed)) return true;
+
+    // 8. Horizontal rules: --- or ***
+    if (/(^|\n)\s*(?:---+|\*\*\*+|___+)\s*($|\n)/.test(trimmed)) return true;
+
+    // 9. Multiple bullet lines or numbered list lines
     const bulletMatches = trimmed.match(/(^|\n)\s*[-*+]\s+\S/g);
     if (bulletMatches && bulletMatches.length >= 2) return true;
 
@@ -51,7 +61,21 @@ class MarkdownModule {
   }
 
   /**
-   * Formats inline markdown formatting (bold, italic, code, links, math badges)
+   * Helper: Determines if a given URL points directly to an image asset
+   */
+  isImageUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const clean = url.trim().replace(/^<|>$/g, '');
+    if (clean.startsWith('data:image/')) return true;
+    if (/images\.openai\.com/i.test(clean)) return true;
+    if (/(?:unsplash\.com\/photos|images\.unsplash\.com|i\.imgur\.com|cloudinary\.com|googleusercontent\.com)/i.test(clean)) return true;
+    if (/\.(?:png|jpe?g|webp|gif|svg|bmp|tiff|avif)(\?.*)?$/i.test(clean)) return true;
+    if (/\?.*(?:purpose=inline|format=(?:png|jpe?g|webp)|width=)/i.test(clean)) return true;
+    return false;
+  }
+
+  /**
+   * Formats inline markdown formatting (bold, italic, code, links, strikethrough)
    */
   formatInline(text) {
     if (!text) return '';
@@ -68,8 +92,14 @@ class MarkdownModule {
     // 3. Inline code: `code`
     out = out.replace(/`([^`]+?)`/g, '<code style="background:rgba(0,0,0,0.06);padding:2px 5px;border-radius:4px;font-family:monospace;font-size:0.9em;">$1</code>');
 
-    // 4. Links: [text](url) -> unwrap to text for clean reading notes
-    out = out.replace(/\[([^\]]+)\]\((?:https?:\/\/[^)]+)\)/g, '$1');
+    // 4. Links: [text](url) -> if it's an image URL, preserve it; otherwise unwrap to clean reading text
+    out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+      const cleanUrl = url.trim().replace(/^<|>$/g, '');
+      if (this.isImageUrl(cleanUrl)) {
+        return match;
+      }
+      return linkText;
+    });
 
     // 5. Strikethrough: ~~text~~
     out = out.replace(/~~(.+?)~~/g, '<del>$1</del>');
@@ -78,8 +108,8 @@ class MarkdownModule {
   }
 
   /**
-   * Robust extractor for pictures in AI chatbot messages:
-   * Handles linked pictures [![Alt](url)](link), standard ![Alt](url "title"), and raw <img src="...">
+   * Universal picture extractor:
+   * Handles linked pictures [![Alt](url)](link), standard ![Alt](url), unflagged [Alt](image_url), and raw <img src="...">
    */
   extractImageFromText(line) {
     if (!line) return null;
@@ -88,17 +118,26 @@ class MarkdownModule {
     // 1. Linked Markdown Image: [![Alt](url)](link)
     const linkedMatch = trimmed.match(/\[!\[([^\]]*)\]\(\s*([^\s)"']+)(?:\s+["'][^"']*["'])?\s*\)\]\([^)]+\)/);
     if (linkedMatch) {
-      return { src: linkedMatch[2].trim(), caption: linkedMatch[1].trim(), raw: linkedMatch[0] };
+      return { src: linkedMatch[2].trim().replace(/^<|>$/g, ''), caption: linkedMatch[1].trim(), raw: linkedMatch[0] };
     }
 
-    // 2. Standard Markdown Image: ![Alt](url "optional title")
-    const mdMatch = trimmed.match(/!\[([^\]]*)\]\(\s*([^\s)"']+)(?:\s+["'][^"']*["'])?\s*\)/);
+    // 2. Standard Markdown Image: ![Alt](url "optional title") or ![Alt](<url>)
+    const mdMatch = trimmed.match(/!\[([^\]]*)\]\(\s*([^\s)"'>]+|<[^>]+>)(?:\s+["'][^"']*["'])?\s*\)/);
     if (mdMatch) {
-      return { src: mdMatch[2].trim(), caption: mdMatch[1].trim(), raw: mdMatch[0] };
+      return { src: mdMatch[2].trim().replace(/^<|>$/g, ''), caption: mdMatch[1].trim(), raw: mdMatch[0] };
     }
 
-    // 3. Raw HTML <img> tag
-    const htmlImgMatch = trimmed.match(/<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i);
+    // 3. Unflagged Image Link from AI Chatbots (e.g. ChatGPT [Title](https://images.openai.com/...?purpose=inline))
+    const unflaggedMatch = trimmed.match(/\[([^\]]*)\]\(\s*([^\s)"'>]+|<[^>]+>)(?:\s+["'][^"']*["'])?\s*\)/);
+    if (unflaggedMatch) {
+      const candidateUrl = unflaggedMatch[2].trim().replace(/^<|>$/g, '');
+      if (this.isImageUrl(candidateUrl)) {
+        return { src: candidateUrl, caption: unflaggedMatch[1].trim(), raw: unflaggedMatch[0] };
+      }
+    }
+
+    // 4. Raw HTML <img> tag
+    const htmlImgMatch = trimmed.match(/<img\s+[^>]*src=["']?([^"'\s>]+)["']?[^>]*>/i);
     if (htmlImgMatch) {
       const src = htmlImgMatch[1].trim();
       const altMatch = trimmed.match(/alt=["']([^"']*)["']/i);
@@ -107,7 +146,47 @@ class MarkdownModule {
       return { src, caption: caption.trim(), raw: htmlImgMatch[0] };
     }
 
+    // 5. Bare image URL on its own line
+    if (this.isImageUrl(trimmed)) {
+      return { src: trimmed.replace(/^<|>$/g, ''), caption: '', raw: trimmed };
+    }
+
     return null;
+  }
+
+  /**
+   * Slices a line containing text and images into sequential units without dropping any text!
+   */
+  segmentTextAndImages(line) {
+    if (!line) return [];
+    const segments = [];
+    let remaining = line.trim();
+
+    while (remaining.length > 0) {
+      const imgInfo = this.extractImageFromText(remaining);
+      if (!imgInfo) {
+        segments.push({ type: 'text', content: remaining });
+        break;
+      }
+
+      const imgIdx = remaining.indexOf(imgInfo.raw);
+      if (imgIdx > 0) {
+        const textBefore = remaining.substring(0, imgIdx).trim();
+        if (textBefore.length > 0) {
+          segments.push({ type: 'text', content: textBefore });
+        }
+      }
+
+      segments.push({
+        type: 'image',
+        src: imgInfo.src,
+        caption: imgInfo.caption
+      });
+
+      remaining = remaining.substring(imgIdx + imgInfo.raw.length).trim();
+    }
+
+    return segments;
   }
 
   /**
@@ -147,7 +226,14 @@ class MarkdownModule {
         continue;
       }
 
-      // 1. Block Math: $$ ... $$, \[ ... \], or \begin{equation}
+      // 1. Horizontal Divider: ---, ***, ___
+      if (/^(?:---+|\*\*\*+|___+)$/.test(trimmed)) {
+        units.push({ type: 'divider' });
+        i++;
+        continue;
+      }
+
+      // 2. Block Math: $$ ... $$, \[ ... \], or \begin{equation} / \begin{align}
       if (trimmed.startsWith('$$') || trimmed.startsWith('\\[') || trimmed.startsWith('\\begin{equation}') || trimmed.startsWith('\\begin{align}')) {
         let mathContent = '';
         const isBracket = trimmed.startsWith('\\[');
@@ -177,27 +263,64 @@ class MarkdownModule {
         }
       }
 
-      // 2. Picture Detection (Linked, standard markdown, or HTML img tag)
-      const imgInfo = this.extractImageFromText(trimmed);
-      if (imgInfo) {
-        units.push({
-          type: 'image',
-          caption: imgInfo.caption,
-          src: imgInfo.src
-        });
-        // Check if there was other text on the line beside the image
-        const remaining = trimmed.replace(imgInfo.raw, '').trim();
-        if (remaining.length > 0) {
-          units.push({
-            type: 'text',
-            content: this.formatInline(remaining)
-          });
+      // 3. Blockquote / Callout Box: > Note or > [!NOTE]
+      if (trimmed.startsWith('>')) {
+        const quoteLines = [];
+        while (i < lines.length && lines[i].trim().startsWith('>')) {
+          quoteLines.push(lines[i].trim().replace(/^>\s?/, ''));
+          i++;
         }
+        const quoteText = quoteLines.join('<br>');
+        units.push({
+          type: 'callout',
+          content: this.formatInline(quoteText)
+        });
+        continue;
+      }
+
+      // 4. Interactive Task Checklist: - [ ] Task or - [x] Done
+      if (/^[-*+]\s+\[([ xX])\]\s+/.test(trimmed)) {
+        const taskItems = [];
+        while (i < lines.length && /^[-*+]\s+\[([ xX])\]\s+/.test(lines[i].trim())) {
+          const m = lines[i].trim().match(/^[-*+]\s+\[([ xX])\]\s+(.+)$/);
+          if (m) {
+            taskItems.push({
+              checked: m[1].toLowerCase() === 'x',
+              text: this.formatInline(m[2].trim())
+            });
+          }
+          i++;
+        }
+        units.push({
+          type: 'task-list',
+          items: taskItems
+        });
+        continue;
+      }
+
+      // 5. Sequential Picture & Mixed Text Line Detection
+      const segments = this.segmentTextAndImages(trimmed);
+      const hasImageInSegments = segments.some(s => s.type === 'image');
+      if (hasImageInSegments) {
+        segments.forEach(seg => {
+          if (seg.type === 'image') {
+            units.push({
+              type: 'image',
+              src: seg.src,
+              caption: seg.caption
+            });
+          } else if (seg.content && seg.content.trim().length > 0) {
+            units.push({
+              type: 'text',
+              content: this.formatInline(seg.content.trim())
+            });
+          }
+        });
         i++;
         continue;
       }
 
-      // 3. Markdown Headings: # through ######
+      // 6. Markdown Headings: # through ######
       const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
       if (headingMatch) {
         const level = headingMatch[1].length;
@@ -212,7 +335,7 @@ class MarkdownModule {
         continue;
       }
 
-      // 4. Flexible Table Detection: bordered (| A | B |) or borderless (A | B)
+      // 7. Flexible Table Detection: bordered (| A | B |) or borderless (A | B)
       if (trimmed.includes('|') && i + 1 < lines.length && this.isTableSeparatorRow(lines[i + 1])) {
         const tableLines = [trimmed, lines[i + 1].trim()];
         i += 2;
@@ -228,7 +351,7 @@ class MarkdownModule {
         }
       }
 
-      // 5. Code Block: ```lang ... ```
+      // 8. Code Block: ```lang ... ```
       if (trimmed.startsWith('```')) {
         const codeLines = [];
         i++;
@@ -245,10 +368,10 @@ class MarkdownModule {
         continue;
       }
 
-      // 6. Bullet Lists: - item, * item, + item
+      // 9. Bullet Lists: - item, * item, + item
       if (/^[-*+]\s+/.test(trimmed)) {
         const listItems = [];
-        while (i < lines.length && /^[-*+]\s+/.test(lines[i].trim())) {
+        while (i < lines.length && /^[-*+]\s+/.test(lines[i].trim()) && !/^[-*+]\s+\[[ xX]\]\s+/.test(lines[i].trim())) {
           const itemText = lines[i].trim().replace(/^[-*+]\s+/, '');
           listItems.push(this.formatInline(itemText));
           i++;
@@ -262,7 +385,7 @@ class MarkdownModule {
         continue;
       }
 
-      // 7. Numbered Lists: 1. item, 2. item
+      // 10. Numbered Lists: 1. item, 2. item
       if (/^\d+\.\s+/.test(trimmed)) {
         const listItems = [];
         while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
@@ -279,7 +402,7 @@ class MarkdownModule {
         continue;
       }
 
-      // 8. Standard text paragraph
+      // 11. Standard text paragraph
       units.push({
         type: 'text',
         content: this.formatInline(trimmed)

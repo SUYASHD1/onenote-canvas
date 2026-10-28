@@ -34,7 +34,8 @@ class HistoryManager {
         width: box.width,
         height: box.height,
         html: box.contentArea.innerHTML
-      }))
+      })),
+      strokes: this.app.inkEngine ? this.app.inkEngine.serializeStrokes() : []
     };
   }
 
@@ -140,8 +141,12 @@ class HistoryManager {
 
     this.app.boxIdCounter = Math.max(this.app.boxIdCounter, maxId);
     this.app.canvas.ensureBounds(this.app.noteBoxes);
-    this.persistToStorage(state);
 
+    if (this.app.inkEngine) {
+      this.app.inkEngine.restoreStrokes(state.strokes || []);
+    }
+
+    this.persistToStorage(state);
     this.isRestoring = false;
   }
 

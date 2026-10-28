@@ -402,8 +402,8 @@ class MathModule {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     const nodesToReplace = [];
 
-    // Match \( formula \) or $ formula $
-    const mathPattern = /(\\\([^\)]+\\\)|\$[^$]+\$)/;
+    // Match \( formula \) or $ formula $ (lazy matching prevents internal parentheses like (x,y) from breaking)
+    const mathPattern = /(\\\(.*?[^\\]\\\)|(?<!\$)\$(?!\s)[^$\n]+?(?<!\s)\$)/;
 
     while (walker.nextNode()) {
       const node = walker.currentNode;
@@ -416,7 +416,7 @@ class MathModule {
       const parent = node.parentNode;
       if (!parent || parent.closest('.math-block') || parent.classList?.contains('inline-math')) return;
 
-      const parts = node.nodeValue.split(/(\\\([^\)]+\\\)|\$[^$]+\$)/g);
+      const parts = node.nodeValue.split(/(\\\(.*?[^\\]\\\)|(?<!\$)\$(?!\s)[^$\n]+?(?<!\s)\$)/g);
       const fragment = document.createDocumentFragment();
 
       parts.forEach(part => {
@@ -426,9 +426,9 @@ class MathModule {
         if (part.startsWith('\\(') && part.endsWith('\\)') && part.length > 4) {
           latex = part.slice(2, -2).trim();
         } else if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
-          // Check $ formula $ (ignore currency like $20)
+          // Check $ formula $ (ignore currency like $20, $100, $10 to $20)
           const candidate = part.slice(1, -1).trim();
-          if (!/^\d+(?:\.\d+)?$/.test(candidate)) {
+          if (!/^\d+(?:\.\d+)?$/.test(candidate) && !/^\d+\s*(?:to|-)\s*\$?\d+$/i.test(candidate)) {
             latex = candidate;
           }
         }

@@ -871,6 +871,674 @@ where:
     });
     assert(multiEquationHtmlTest, 'Web HTML paste captures ALL 10+ equations in original reading sequence without dropping any, and AI chatbot HTML brackets \\[...\\] render as textbook Equation Cards');
 
+    // TEST 24: Cursor-Anchored Zero-Drift Zooming
+    console.log('\n--- 24. Cursor-Anchored Zero-Drift Zooming ---');
+    const zeroDriftResult = await page.evaluate(() => {
+      const canvas = window.app.canvas;
+      canvas.setZoom(1.0);
+      canvas.viewport.scrollLeft = 100;
+      canvas.viewport.scrollTop = 100;
+
+      const vRect = canvas.viewport.getBoundingClientRect();
+      const screenX = vRect.left + 350;
+      const screenY = vRect.top + 250;
+
+      // Calculate world coordinate before zoom
+      const pivotX = screenX - vRect.left;
+      const pivotY = screenY - vRect.top;
+      const worldXBefore = (canvas.viewport.scrollLeft + pivotX) / canvas.zoomLevel;
+      const worldYBefore = (canvas.viewport.scrollTop + pivotY) / canvas.zoomLevel;
+
+      // Zoom in anchored at (screenX, screenY)
+      canvas.adjustZoom(0.3, screenX, screenY);
+
+      // Calculate world coordinate after zoom
+      const worldXAfter = (canvas.viewport.scrollLeft + pivotX) / canvas.zoomLevel;
+      const worldYAfter = (canvas.viewport.scrollTop + pivotY) / canvas.zoomLevel;
+
+      canvas.setZoom(1.0);
+      canvas.viewport.scrollLeft = 0;
+      canvas.viewport.scrollTop = 0;
+
+      return Math.abs(worldXBefore - worldXAfter) < 2 && Math.abs(worldYBefore - worldYAfter) < 2;
+    });
+    assert(zeroDriftResult, 'Cursor-anchored zooming preserves exact coordinate under pointer with zero drift');
+
+    // TEST 25: Kinetic Momentum Panning (Gliding)
+    console.log('\n--- 25. Kinetic Momentum Panning (Gliding) ---');
+    const momentumResult = await page.evaluate(async () => {
+      const canvas = window.app.canvas;
+      canvas.viewport.scrollLeft = 0;
+      canvas.startMomentum(-25, 0); // pan right
+      await new Promise(r => setTimeout(r, 80));
+      const midScroll = canvas.viewport.scrollLeft;
+      await new Promise(r => setTimeout(r, 80));
+      const endScroll = canvas.viewport.scrollLeft;
+      canvas.stopMomentum();
+      canvas.viewport.scrollLeft = 0;
+      return midScroll > 10 && endScroll >= midScroll;
+    });
+    assert(momentumResult, 'Kinetic momentum panning smoothly coasts viewport to a natural halt');
+
+    // TEST 26: Ghost Spatial Scrollbars
+    console.log('\n--- 26. Ghost Spatial Scrollbars ---');
+    const ghostScrollResult = await page.evaluate(() => {
+      const hTrack = document.getElementById('ghost-scrollbar-h');
+      const vTrack = document.getElementById('ghost-scrollbar-v');
+      const hThumb = document.getElementById('ghost-thumb-h');
+      const vThumb = document.getElementById('ghost-thumb-v');
+      if (!hTrack || !vTrack || !hThumb || !vThumb) return false;
+
+      // Verify track click jumps scroll
+      const rect = hTrack.getBoundingClientRect();
+      hTrack.dispatchEvent(new MouseEvent('mousedown', {
+        clientX: rect.left + rect.width * 0.4,
+        clientY: rect.top + 4,
+        bubbles: true
+      }));
+
+      const scrollAfterJump = window.app.canvas.viewport.scrollLeft;
+      window.app.canvas.viewport.scrollLeft = 0;
+      window.app.canvas.updateGhostScrollbars();
+
+      return hThumb.offsetWidth > 20 && vThumb.offsetHeight > 20 && scrollAfterJump > 0;
+    });
+    assert(ghostScrollResult, 'Ghost Spatial Scrollbars render proportional thumbs and support click-to-jump');
+
+    // TEST 27: Marquee Multi-Box Selection & Group Dragging
+    console.log('\n--- 27. Marquee Multi-Box Selection & Group Dragging ---');
+    const marqueeGroupResult = await page.evaluate(async () => {
+      const app = window.app;
+      const note1 = app.noteBoxes[0];
+      const note2 = app.noteBoxes[1];
+      if (!note1 || !note2) return false;
+
+      // Select Note 1 and Note 2 with marquee
+      note1.element.classList.add('multi-selected');
+      note2.element.classList.add('multi-selected');
+
+      const startX1 = note1.x;
+      const startX2 = note2.x;
+
+      // Simulate dragging Note 1 header by 80px
+      const header = note1.header;
+      header.dispatchEvent(new MouseEvent('mousedown', { clientX: 200, clientY: 100, bubbles: true }));
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 280, clientY: 100, bubbles: true }));
+      window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+      const movedBoth = (note1.x === startX1 + 80) && (note2.x === startX2 + 80);
+
+      // Clear selection with deselectAll
+      app.deselectAll();
+      const cleared = !note1.element.classList.contains('multi-selected') && !note2.element.classList.contains('multi-selected');
+
+      // Restore original positions
+      note1.x = startX1;
+      note1.element.style.left = `${startX1}px`;
+      note2.x = startX2;
+      note2.element.style.left = `${startX2}px`;
+
+      return movedBoth && cleared;
+    });
+    assert(marqueeGroupResult, 'Marquee multi-selection groups cards and moves all selected notes together in lockstep');
+
+    // TEST 28: Collapsible Sidebar Toggling
+    console.log('\n--- 28. Collapsible Sidebar Toggling ---');
+    const sidebarToggleResult = await page.evaluate(() => {
+      const toggleBtn = document.getElementById('btn-toggle-sidebar');
+      const sidebar = document.getElementById('app-sidebar');
+      if (!toggleBtn || !sidebar) return false;
+
+      // Click to collapse
+      toggleBtn.click();
+      const isCollapsed = sidebar.classList.contains('collapsed');
+
+      // Click to expand back
+      toggleBtn.click();
+      const isExpanded = !sidebar.classList.contains('collapsed');
+
+      return isCollapsed && isExpanded;
+    });
+    assert(sidebarToggleResult, 'Sidebar collapses and expands smoothly via toggle button');
+
+    // TEST 29: Three-Tier Hierarchy (Notebooks, Sections, Pages)
+    console.log('\n--- 29. Three-Tier Hierarchy Structure ---');
+    const hierarchyResult = await page.evaluate(() => {
+      const nbItems = document.querySelectorAll('#sidebar-notebooks-list .notebook-item');
+      const secItems = document.querySelectorAll('#sidebar-sections-list .section-item');
+      const pageItems = document.querySelectorAll('#sidebar-pages-list .page-item');
+
+      const nbTitle = document.getElementById('notebook-name-display')?.textContent;
+      const pageTitle = document.getElementById('page-title-display')?.textContent;
+
+      return nbItems.length >= 1 &&
+             secItems.length >= 1 &&
+             pageItems.length >= 1 &&
+             nbTitle.includes('Personal Workspace') &&
+             pageTitle.includes('Project Canvas');
+    });
+    assert(hierarchyResult, 'Three-tier hierarchy displays Notebooks, Sections, and Pages with active indicators');
+
+    // TEST 30: Clean Blank Page Guarantee
+    console.log('\n--- 30. Clean Blank Page Guarantee ---');
+    const cleanPageResult = await page.evaluate(() => {
+      const sidebar = window.app.sidebar;
+      sidebar.createPage('My Clean Blank Canvas');
+
+      const activePage = sidebar.getActivePage();
+      const noteCount = window.app.noteBoxes.length;
+
+      return activePage.title === 'My Clean Blank Canvas' && noteCount === 0;
+    });
+    assert(cleanPageResult, 'Creating a new page guarantees a 100% clean, blank canvas with 0 lingering notes');
+
+    // TEST 31: Instant Page Switching & Persistence
+    console.log('\n--- 31. Instant Page Switching & Canvas Persistence ---');
+    const pageSwitchResult = await page.evaluate(() => {
+      const app = window.app;
+      const sidebar = app.sidebar;
+
+      // 1. Add a note on the new blank page
+      const page2Box = app.createNoteBox(200, 200, 300);
+      page2Box.addTextBlock('Unique Page 2 Thought');
+      const page2Id = sidebar.state.activePageId;
+
+      // 2. Switch back to Page 1 ("Project Canvas")
+      const page1 = sidebar.getActiveSection().pages[0];
+      sidebar.selectPage(page1.id);
+      const page1NoteCount = app.noteBoxes.length;
+
+      // 3. Switch back to Page 2
+      sidebar.selectPage(page2Id);
+      const page2NoteCount = app.noteBoxes.length;
+      const page2Text = app.noteBoxes[0]?.contentArea?.textContent || '';
+
+      return page1NoteCount >= 3 && page2NoteCount === 1 && page2Text.includes('Unique Page 2 Thought');
+    });
+    assert(pageSwitchResult, 'Switching pages auto-saves state and instantly restores canvas content');
+
+    // TEST 32: Section Creation & Inline Renaming
+    console.log('\n--- 32. Section Creation & Renaming ---');
+    const sectionCreateResult = await page.evaluate(() => {
+      const sidebar = window.app.sidebar;
+      sidebar.createSection('Lab Experiments');
+
+      const activeSec = sidebar.getActiveSection();
+      const isLab = activeSec.name === 'Lab Experiments';
+
+      // Rename section
+      activeSec.name = 'Deep Research Lab';
+      sidebar.render();
+
+      const secItems = Array.from(document.querySelectorAll('#sidebar-sections-list .section-item'));
+      const foundRenamed = secItems.some(el => el.textContent.includes('Deep Research Lab'));
+
+      // Switch back to original section and page 1
+      const defaultSec = sidebar.getActiveNotebook().sections[0];
+      sidebar.selectSection(defaultSec.id);
+
+      return isLab && foundRenamed;
+    });
+    assert(sectionCreateResult, 'Sections can be created, switched, and renamed cleanly');
+
+    // TEST 33: Multi-Store IndexedDB Engine & Persistence Safe-Lock
+    console.log('\n--- 33. Multi-Store IndexedDB Engine & Persistence ---');
+    const idbInitResult = await page.evaluate(async () => {
+      const vault = window.app.storageVault;
+      if (!vault || !vault.db) return false;
+
+      const storeNames = Array.from(vault.db.objectStoreNames);
+      const hasPages = storeNames.includes('pages');
+      const hasHierarchy = storeNames.includes('hierarchy');
+      const hasAssets = storeNames.includes('assets');
+      const hasSettings = storeNames.includes('settings');
+
+      const isPersisted = await vault.checkPersistence();
+      return hasPages && hasHierarchy && hasAssets && hasSettings && (typeof isPersisted === 'boolean');
+    });
+    assert(idbInitResult, 'IndexedDB initializes with 4 partitioned stores and checks persistence safe-lock');
+
+    // TEST 34: Storage Vault Dialog & Live Diagnostics
+    console.log('\n--- 34. Storage Vault Dialog & Live Diagnostics ---');
+    const diagnosticsResult = await page.evaluate(async () => {
+      const vault = window.app.storageVault;
+      const modal = document.getElementById('storage-hub-modal');
+      const openBtn = document.getElementById('btn-storage-hub');
+      const closeBtn = document.getElementById('btn-close-storage-hub');
+
+      // 1. Open modal
+      openBtn.click();
+      await new Promise(r => setTimeout(r, 100));
+      const isOpen = modal.classList.contains('active');
+
+      // 2. Check stats populated
+      const nbText = document.getElementById('stat-notebooks-count').textContent;
+      const notesText = document.getElementById('stat-notes-count').textContent;
+      const statsValid = parseInt(nbText, 10) >= 1 && parseInt(notesText, 10) >= 1;
+
+      // 3. Close modal
+      closeBtn.click();
+      const isClosed = !modal.classList.contains('active');
+
+      return isOpen && statsValid && isClosed;
+    });
+    assert(diagnosticsResult, 'Storage Vault dialog opens, reports live diagnostics, and closes cleanly');
+
+    // TEST 35: One-Click Backup Export Payload Verification
+    console.log('\n--- 35. One-Click Backup Export Payload ---');
+    const exportResult = await page.evaluate(async () => {
+      const vault = window.app.storageVault;
+      const backup = await vault.exportBackup();
+      return backup &&
+             backup.app === 'OneNote Spatial Canvas' &&
+             backup.formatVersion === '1.0' &&
+             backup.hierarchy &&
+             Array.isArray(backup.hierarchy.notebooks) &&
+             backup.diagnostics;
+    });
+    assert(exportResult, 'One-Click Backup exports complete library payload with hierarchy and diagnostics');
+
+    // TEST 36: One-Click Backup Restore & Clean Canvas Reload
+    console.log('\n--- 36. One-Click Backup Restore & Clean Reload ---');
+    const restoreResult = await page.evaluate(async () => {
+      const vault = window.app.storageVault;
+      const sidebar = window.app.sidebar;
+
+      const mockBackup = {
+        app: 'OneNote Spatial Canvas',
+        formatVersion: '1.0',
+        exportedAt: new Date().toISOString(),
+        hierarchy: {
+          activeNotebookId: 'nb-restore',
+          activeSectionId: 'sec-restore',
+          activePageId: 'page-restore',
+          notebooks: [
+            {
+              id: 'nb-restore',
+              name: 'Restored Vault 2026',
+              icon: '🚀',
+              sections: [
+                {
+                  id: 'sec-restore',
+                  name: 'Blueprint Section',
+                  color: '#00b7c3',
+                  pages: [
+                    {
+                      id: 'page-restore',
+                      title: 'Master Blueprint Page',
+                      preview: 'Restored blueprint card...',
+                      data: {
+                        boxes: [
+                          {
+                            id: 999,
+                            x: 180,
+                            y: 160,
+                            width: 380,
+                            height: 140,
+                            html: '<p>Restored Master Blueprint Card from Vault</p>'
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        pages: [
+          {
+            id: 'page-restore',
+            data: {
+              boxes: [
+                {
+                  id: 999,
+                  x: 180,
+                  y: 160,
+                  width: 380,
+                  height: 140,
+                  html: '<p>Restored Master Blueprint Card from Vault</p>'
+                }
+              ]
+            }
+          }
+        ]
+      };
+
+      const success = await vault.importBackup(mockBackup);
+      const activeNb = sidebar.getActiveNotebook();
+      const restoredTitle = activeNb ? activeNb.name : '';
+      const restoredCardContent = window.app.noteBoxes[0]?.contentArea?.textContent || '';
+      return success &&
+             restoredTitle === 'Restored Vault 2026' &&
+             restoredCardContent.includes('Restored Master Blueprint Card');
+    });
+    assert(restoreResult, 'One-Click Backup Restore accurately restores hierarchy and reconstructs canvas state');
+
+    // TEST 37: Smart Ribbon "Two-Way Mirror" Cursor Inspection
+    console.log('\n--- 37. Smart Ribbon "Two-Way Mirror" Inspection ---');
+    const mirrorResult = await page.evaluate(async () => {
+      const box = window.app.noteBoxes[0];
+      if (!box) return false;
+
+      // Add a bold heading paragraph
+      const p = document.createElement('h1');
+      p.innerHTML = '<strong>Big Mirror Heading</strong>';
+      box.contentArea.appendChild(p);
+
+      // Place selection inside strong element
+      const range = document.createRange();
+      range.selectNodeContents(p.querySelector('strong'));
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      window.app.ribbonController.inspectCursor();
+
+      const btnBoldActive = document.getElementById('btn-bold').classList.contains('active');
+      const headingVal = document.getElementById('select-heading').value;
+
+      return btnBoldActive && headingVal === 'h1';
+    });
+    assert(mirrorResult, 'Two-Way Mirror inspects cursor and lights up Bold button and Heading dropdown');
+
+    // TEST 38: 2-in-1 Split Font Color & Illuminated Bar
+    console.log('\n--- 38. 2-in-1 Split Font Color Tool ---');
+    const splitColorResult = await page.evaluate(async () => {
+      const chevron = document.getElementById('btn-font-color-chevron');
+      const palette = document.getElementById('palette-font-color');
+      const bar = document.getElementById('font-color-bar');
+
+      // 1. Click chevron to open palette
+      chevron.click();
+      const paletteOpened = palette.classList.contains('active');
+
+      // 2. Click Royal Blue swatch
+      const swatches = Array.from(palette.querySelectorAll('.palette-swatch-item'));
+      const blueSwatch = swatches.find(s => s.title.includes('Royal Blue'));
+      if (blueSwatch) {
+        blueSwatch.click();
+      }
+
+      const barUpdated = bar.style.backgroundColor.includes('0, 120, 212') || bar.style.backgroundColor.includes('#0078d4');
+      const paletteClosed = !palette.classList.contains('active');
+
+      return paletteOpened && barUpdated && paletteClosed;
+    });
+    assert(splitColorResult, 'Split font color tool opens palette, updates illuminated bar, and applies color');
+
+    // TEST 39: 2-in-1 Split Highlighter with Chisel Swatches
+    console.log('\n--- 39. 2-in-1 Split Highlighter Tool ---');
+    const splitHighlightResult = await page.evaluate(async () => {
+      const chevron = document.getElementById('btn-highlight-chevron');
+      const palette = document.getElementById('palette-highlight-color');
+      const bar = document.getElementById('highlight-color-bar');
+
+      // 1. Click chevron to open palette
+      chevron.click();
+      const paletteOpened = palette.classList.contains('active');
+
+      // 2. Click Green swatch
+      const swatches = Array.from(palette.querySelectorAll('.palette-swatch-item'));
+      const greenSwatch = swatches.find(s => s.title.includes('Green'));
+      if (greenSwatch) {
+        greenSwatch.click();
+      }
+
+      const barUpdated = bar.style.backgroundColor !== '';
+      const paletteClosed = !palette.classList.contains('active');
+
+      return paletteOpened && barUpdated && paletteClosed;
+    });
+    assert(splitHighlightResult, 'Split highlighter tool opens palette, updates illuminated bar, and closes smoothly');
+
+    // TEST 40: Selection Lock (Text Selection Preservation)
+    console.log('\n--- 40. Selection Lock (Text Selection Preservation) ---');
+    const selectionLockResult = await page.evaluate(async () => {
+      const box = window.app.noteBoxes[0];
+      const p = box.contentArea.querySelector('h1') || box.contentArea.querySelector('p');
+      if (!p) return false;
+
+      // Select text in p
+      const range = document.createRange();
+      range.selectNodeContents(p);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      const originalText = sel.toString();
+
+      // Snapshot selection
+      window.app.ribbonController.snapshotSelection();
+
+      // Collapse / deselect
+      sel.removeAllRanges();
+      const wasCleared = sel.rangeCount === 0;
+
+      // Restore selection
+      window.app.ribbonController.restoreSelection();
+      const restoredText = window.getSelection().toString();
+
+      return wasCleared && restoredText === originalText && restoredText.length > 0;
+    });
+    assert(selectionLockResult, 'Selection Lock snapshots and restores DOM text selection accurately');
+
+    // TEST 41: Inking Mode Switching & "Sheet of Glass" Prevention
+    console.log('\n--- 41. Inking Mode Switching & Sheet of Glass Prevention ---');
+    const inkSwitchResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      const navBtn = document.getElementById('btn-draw-pointer');
+      const penBtn = document.getElementById('btn-draw-pen');
+      const drawCanvas = document.getElementById('active-draw-canvas');
+
+      // 1. Initial navigate mode has pointer-events: none (no sheet of glass!)
+      ink.setMode('navigate');
+      const navEvents = drawCanvas.style.pointerEvents === 'none';
+
+      // 2. Click Pen mode switches to pointer-events: auto
+      penBtn.click();
+      const penEvents = drawCanvas.style.pointerEvents === 'auto';
+      const isPenActive = penBtn.classList.contains('active');
+
+      // 3. Switch back to Navigate
+      navBtn.click();
+      const backToNav = drawCanvas.style.pointerEvents === 'none';
+
+      return navEvents && penEvents && isPenActive && backToNav;
+    });
+    assert(inkSwitchResult, 'Inking mode controls switch between Navigate & Ink modes without sheet of glass blocking');
+
+    // TEST 42: Fluid Ballpoint Pen Inking & Stroke Vector Recording
+    console.log('\n--- 42. Fluid Ballpoint Pen Inking & Vector Storage ---');
+    const penInkingResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      ink.setMode('pen');
+      const canvas = ink.inkCanvas;
+
+      // Simulate a pen stroke
+      canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 200, pressure: 0.6 }));
+      canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: 230, clientY: 220, pressure: 0.8 }));
+      canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: 260, clientY: 250, pressure: 0.9 }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', { clientX: 260, clientY: 250 }));
+
+      const strokeSaved = ink.strokes.length >= 1;
+      const lastStroke = ink.strokes[ink.strokes.length - 1];
+      const isValidStroke = lastStroke && lastStroke.tool === 'pen' && lastStroke.points.length >= 3;
+
+      ink.setMode('navigate');
+      return strokeSaved && isValidStroke;
+    });
+    assert(penInkingResult, 'Ballpoint pen inking records smooth vector strokes with pressure points');
+
+    // TEST 43: True Under-Text Chisel Highlighter
+    console.log('\n--- 43. True Under-Text Chisel Highlighter ---');
+    const highlighterResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      const hlCanvas = document.getElementById('highlighter-draw-canvas');
+      const isUnderText = hlCanvas.classList.contains('under-text');
+      const hasMultiply = window.getComputedStyle(hlCanvas).mixBlendMode === 'multiply';
+
+      ink.setMode('highlighter');
+      const canvas = ink.inkCanvas;
+      canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+      canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: 380, clientY: 200 }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', { clientX: 380, clientY: 200 }));
+
+      const lastStroke = ink.strokes[ink.strokes.length - 1];
+      const isHlStroke = lastStroke && lastStroke.tool === 'highlighter' && lastStroke.width >= 16;
+
+      ink.setMode('navigate');
+      return isUnderText && hasMultiply && isHlStroke;
+    });
+    assert(highlighterResult, 'Under-text highlighter utilizes multiply blending layer and chisel widths');
+
+    // TEST 44: Draw-and-Hold Geometric Shape Snapping
+    console.log('\n--- 44. Draw-and-Hold Geometric Shape Snapping ---');
+    const shapeSnapResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      ink.setMode('pen');
+
+      // Create a mock circular loop stroke
+      const points = [];
+      const cx = 400, cy = 300, r = 50;
+      for (let i = 0; i <= 16; i++) {
+        const theta = (i / 16) * Math.PI * 2;
+        points.push({ x: cx + Math.cos(theta) * r, y: cy + Math.sin(theta) * r, p: 0.5 });
+      }
+
+      ink.currentStroke = {
+        id: 'stroke-circle',
+        tool: 'pen',
+        color: '#7719aa',
+        width: 3,
+        points: points,
+        shape: null
+      };
+
+      ink.snapCurrentStroke();
+      const isSnapped = ink.currentStroke.shape !== null && ink.currentStroke.shape.type === 'ellipse';
+
+      ink.strokes.push(ink.currentStroke);
+      ink.currentStroke = null;
+      ink.renderAllStrokes();
+      ink.setMode('navigate');
+
+      return isSnapped;
+    });
+    assert(shapeSnapResult, 'Draw-and-hold shape snapping detects and converts rough closed loops into clean ellipses');
+
+    // TEST 45: Smart Stroke Eraser
+    console.log('\n--- 45. Smart Stroke Eraser ---');
+    const eraserResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      const initialCount = ink.strokes.length;
+
+      ink.setMode('eraser');
+      // Erase at coordinate (400, 300) where the snapped circle was drawn
+      ink.eraseAt(400, 300);
+
+      const countAfter = ink.strokes.length;
+      const wasErased = countAfter < initialCount;
+
+      ink.setMode('navigate');
+      return wasErased;
+    });
+    assert(eraserResult, 'Smart stroke eraser cleanly detects and deletes intersected strokes');
+
+    // TEST 46: Home vs. Draw Ribbon Tab Switching
+    console.log('\n--- 46. Home vs. Draw Ribbon Tab Switching ---');
+    const tabSwitchResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      const tabDraw = document.getElementById('tab-btn-draw');
+      const tabHome = document.getElementById('tab-btn-home');
+      const homeContent = document.getElementById('ribbon-home-content');
+      const drawContent = document.getElementById('ribbon-draw-content');
+
+      // 1. Switch to Draw Tab
+      tabDraw.click();
+      const drawTabActive = tabDraw.classList.contains('active');
+      const drawVisible = drawContent.style.display !== 'none';
+      const homeHidden = homeContent.style.display === 'none';
+      const modeIsPen = ink.mode === 'pen';
+
+      // 2. Switch back to Home Tab
+      tabHome.click();
+      const homeTabActive = tabHome.classList.contains('active');
+      const homeVisible = homeContent.style.display !== 'none';
+      const drawHidden = drawContent.style.display === 'none';
+      const modeIsNav = ink.mode === 'navigate';
+
+      return drawTabActive && drawVisible && homeHidden && modeIsPen &&
+             homeTabActive && homeVisible && drawHidden && modeIsNav;
+    });
+    assert(tabSwitchResult, 'Top ribbon seamlessly switches between Home and Draw inking workspaces');
+
+    // TEST 47: 4 Quick-Color Pen Slots & Dedicated Color Picker
+    console.log('\n--- 47. 4 Quick-Color Pen Slots & Dedicated Color Picker ---');
+    const penSlotsResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      const tabDraw = document.getElementById('tab-btn-draw');
+      tabDraw.click();
+
+      // 1. Switch between slots
+      const slot2 = document.getElementById('pen-slot-2');
+      slot2.click();
+      const slot2Active = slot2.classList.contains('active') && ink.penColor === '#0078d4';
+
+      // 2. Change active slot using Color Picker input
+      const pickerInput = document.getElementById('draw-color-picker-input');
+      pickerInput.value = '#00b7c3';
+      pickerInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const colorPicked = ink.penColor === '#00b7c3' && ink.colorSlots[ink.activeSlotIndex] === '#00b7c3';
+      const previewUpdated = document.getElementById('draw-picker-preview').style.backgroundColor.includes('0, 183, 195') ||
+                             document.getElementById('draw-picker-preview').style.backgroundColor === '#00b7c3';
+
+      document.getElementById('tab-btn-home').click();
+      return slot2Active && colorPicked && previewUpdated;
+    });
+    assert(penSlotsResult, '4 Quick-Color Pen slots and Color Picker update active pen color and preview immediately');
+
+    // TEST 48: Canvas Palm Lock Enforcement in Ink Mode
+    console.log('\n--- 48. Canvas Palm Lock Enforcement in Ink Mode ---');
+    const palmLockResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      const tabDraw = document.getElementById('tab-btn-draw');
+      tabDraw.click();
+
+      // In Draw Mode, canvas panning and viewport scrolling are completely locked
+      const isLocked = window.app.canvas.isPanningLocked === true;
+      const isOverflowHidden = window.app.canvas.viewport.style.overflow === 'hidden';
+      const hasLockedClass = window.app.canvas.viewport.classList.contains('canvas-locked');
+
+      // Unlock toggle works
+      const toggleBtn = document.getElementById('btn-toggle-canvas-lock');
+      toggleBtn.click();
+      const wasUnlocked = window.app.canvas.isPanningLocked === false &&
+                          window.app.canvas.viewport.style.overflow === 'scroll';
+
+      // Re-lock
+      toggleBtn.click();
+      const reLocked = window.app.canvas.isPanningLocked === true &&
+                       window.app.canvas.viewport.style.overflow === 'hidden';
+
+      document.getElementById('tab-btn-home').click();
+      return isLocked && isOverflowHidden && hasLockedClass && wasUnlocked && reLocked;
+    });
+    assert(palmLockResult, 'Canvas Palm Lock freezes viewport scrolling and gestures against accidental touch');
+
+    // TEST 49: Clean Canvas Guarantee (Floating Puck Completely Removed)
+    console.log('\n--- 49. Clean Canvas Guarantee (Puck Removed) ---');
+    const cleanWorkspaceResult = await page.evaluate(() => {
+      const puck = document.getElementById('mode-switcher-puck');
+      return puck === null;
+    });
+    assert(cleanWorkspaceResult, 'Floating mode puck is completely removed from the workspace for an unhindered canvas');
+
+
+
+
+
     console.log(`\n========================================`);
     console.log(`📊 Test Results: ${passedCount}/${totalCount} Passed (${Math.round((passedCount / totalCount) * 100)}%)`);
     console.log(`========================================\n`);

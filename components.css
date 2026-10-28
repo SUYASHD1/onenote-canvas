@@ -639,3 +639,84 @@
   margin: 3px 0;
   line-height: 1.5;
 }
+
+/* ==========================================================================
+   Callouts, Dividers & Interactive Task Checklists
+   ========================================================================== */
+
+.callout-block {
+  margin: 6px 0;
+}
+
+.callout-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(119, 25, 170, 0.05);
+  border-left: 3.5px solid var(--primary-purple);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  color: #201f1e;
+  line-height: 1.5;
+}
+
+.callout-icon {
+  font-size: 16px;
+  user-select: none;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.callout-content {
+  flex: 1;
+  outline: none;
+}
+
+.divider-block {
+  margin: 8px 0;
+  padding: 2px 0;
+}
+
+.canvas-divider {
+  border: none;
+  border-top: 1px solid #edebe9;
+  margin: 0;
+}
+
+.task-list-block {
+  margin: 4px 0;
+}
+
+.task-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.task-chk {
+  margin-top: 3.5px;
+  cursor: pointer;
+  accent-color: var(--primary-purple);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.task-text {
+  flex: 1;
+  outline: none;
+}
+
+.task-row.completed .task-text {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+

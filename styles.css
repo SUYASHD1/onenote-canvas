@@ -17,6 +17,12 @@
   --guideline-blue: #0078d4;
   --card-bg: #ffffff;
   --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --ghost-scrollbar-bg: rgba(0, 0, 0, 0.06);
+  --ghost-scrollbar-hover: rgba(0, 0, 0, 0.14);
+  --ghost-scrollbar-thumb: #8c8c8c;
+  --ghost-scrollbar-thumb-hover: var(--primary-purple);
+  --marquee-border: var(--guideline-blue);
+  --marquee-bg: rgba(0, 120, 212, 0.08);
   --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', Consolas, monospace;
 }
@@ -84,12 +90,138 @@ body {
   font-weight: 700;
 }
 
+/* OneNote Style Mode Tabs (Home vs. Draw) */
+.ribbon-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 20px;
+}
+
+.ribbon-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.15s ease;
+}
+
+.ribbon-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.ribbon-tab-btn.active {
+  color: var(--primary-purple);
+  font-weight: 600;
+  border-bottom-color: var(--primary-purple);
+  background: rgba(119, 25, 170, 0.04);
+}
+
 .ribbon-bar {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 16px;
   background: #ffffff;
+}
+
+.ribbon-mode-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ribbon-global-group {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 4 Quick-Color Pen Slots & Dedicated Color Picker */
+.pen-slots-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #f3f2f1;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid #e1dfdd;
+}
+
+.pen-slot-item {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  border: 1.5px solid transparent;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.pen-slot-item:hover {
+  transform: translateY(-1px);
+  border-color: #c8c6c4;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.pen-slot-item.active {
+  border-color: var(--primary-purple);
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(119, 25, 170, 0.35);
+  transform: scale(1.08);
+}
+
+.pen-slot-tip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: background-color 0.15s ease;
+}
+
+.draw-picker-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2);
+  border: 1.5px solid #ffffff;
+  display: inline-block;
+  transition: background-color 0.15s ease;
+}
+
+/* Canvas Palm Lock Viewport Enforcement */
+.canvas-viewport.canvas-locked {
+  overflow: hidden !important;
+  touch-action: none !important;
+  user-select: none !important;
+}
+
+.canvas-viewport.canvas-locked .ghost-scrollbar {
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+/* Canvas Palm Lock Badge */
+.canvas-lock-badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #107c41;
 }
 
 .ribbon-group {
@@ -152,16 +284,612 @@ body {
   color: var(--text-muted);
 }
 
+.ribbon-btn.active {
+  background: var(--primary-purple-light);
+  border-color: var(--primary-purple);
+  color: var(--primary-purple);
+}
+
+.ribbon-select {
+  height: 28px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--text-main);
+  background: #ffffff;
+  border: 1px solid #d1d1d1;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.ribbon-select:hover {
+  border-color: #8c8c8c;
+}
+
+.ribbon-select:focus {
+  border-color: var(--primary-purple);
+}
+
+/* 2-in-1 Split Color Tools with Illuminated Status Bar */
+.split-color-container {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+
+.split-color-container:hover {
+  background: #f3f2f1;
+  border-color: #e1dfdd;
+}
+
+.split-color-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+  font-family: inherit;
+}
+
+.split-btn-icon {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.color-illuminated-bar {
+  width: 16px;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 1.5px;
+  transition: background-color 0.2s ease;
+}
+
+.split-chevron-btn {
+  padding: 3px 4px;
+  font-size: 9px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  color: var(--text-muted);
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+
+.split-chevron-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-main);
+}
+
+/* Curated Color & Highlighter Flyout Palette */
+.color-palette-flyout {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: #ffffff;
+  border: 1px solid #edebe9;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  display: none;
+  z-index: 120;
+  animation: slideDown 0.12s ease;
+}
+
+.color-palette-flyout.active {
+  display: block;
+}
+
+.palette-swatches-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 22px);
+  gap: 6px;
+}
+
+.palette-swatch-item {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.palette-swatch-item:hover {
+  transform: scale(1.18);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+
 /* ==========================================================================
    Canvas Viewport & Elastic Stage
    ========================================================================== */
+
+.app-workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* ==========================================================================
+   Authentic OneNote Dual-Column Sidebar & Notebooks Drawer (Light Theme)
+   ========================================================================== */
+
+.app-sidebar {
+  width: 360px;
+  min-width: 360px;
+  background: #f9f9fb;
+  border-right: 1px solid #edebe9;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
+  z-index: 70;
+  user-select: none;
+}
+
+.app-sidebar.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border-right: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Notebook Picker Bar */
+.sidebar-top-bar {
+  height: 44px;
+  background: #faf9f8;
+  border-bottom: 1px solid #edebe9;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.notebook-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 4px;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.notebook-picker-btn:hover {
+  background: #edebe9;
+}
+
+.notebook-picker-btn .notebook-icon {
+  font-size: 16px;
+}
+
+.notebook-picker-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-chevron {
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.notebook-picker-btn.open .picker-chevron {
+  transform: rotate(180deg);
+}
+
+/* Side-by-Side Dual Columns */
+.sidebar-dual-columns {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  height: calc(100% - 44px);
+}
+
+/* Column 1: Sections */
+.sidebar-col.sections-col {
+  width: 165px;
+  min-width: 165px;
+  background: #f9f9fb;
+  border-right: 1px solid #edebe9;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Column 2: Pages */
+.sidebar-col.pages-col {
+  flex: 1;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-col-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d1d1 transparent;
+}
+
+.sidebar-col-content::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-col-content::-webkit-scrollbar-thumb {
+  background: #d1d1d1;
+  border-radius: 2px;
+}
+
+.sidebar-col-footer {
+  height: 38px;
+  border-top: 1px solid #edebe9;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: inherit;
+  flex-shrink: 0;
+}
+
+.sidebar-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--primary-purple);
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 4px;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.sidebar-footer-btn:hover {
+  background: var(--primary-purple-light);
+}
+
+.sidebar-footer-btn .plus-icon {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary-purple);
+}
+
+/* Sections Item with Bookmark Color Tab */
+.section-item {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding: 7px 8px 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-main);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.section-item:hover {
+  background: #edebe9;
+}
+
+.section-item.active {
+  background: #e5e3e1;
+  color: var(--primary-purple);
+  font-weight: 600;
+}
+
+/* OneNote Color Bookmark Tab on the Left */
+.section-bookmark-tab {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 2px;
+}
+
+.section-item-title {
+  flex: 1;
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pages Item with Rich Subtitle Preview */
+.page-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+.page-item:hover {
+  background: #f3f2f1;
+}
+
+.page-item.active {
+  background: var(--primary-purple-light);
+  border-left-color: var(--primary-purple);
+}
+
+.page-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-item-preview {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Action buttons (Rename / Delete) on hover */
+.sidebar-item-actions {
+  display: none;
+  align-items: center;
+  gap: 3px;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: inherit;
+  padding-left: 4px;
+}
+
+.section-item:hover .sidebar-item-actions,
+.page-item:hover .sidebar-item-actions,
+.notebook-item:hover .sidebar-item-actions {
+  display: flex;
+}
+
+.sidebar-action-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 3px;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.sidebar-action-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.sidebar-rename-input {
+  width: 90%;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 2px 4px;
+  border: 1.5px solid var(--primary-purple);
+  border-radius: 3px;
+  outline: none;
+  background: #ffffff;
+  color: var(--text-main);
+}
+
+/* Notebooks Drawer Flyout (Opens on clicking Notebook header) */
+.notebooks-drawer {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  width: 100%;
+  max-height: 280px;
+  background: #ffffff;
+  border-bottom: 1.5px solid #e1dfdd;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  z-index: 95;
+  animation: slideDown 0.15s cubic-bezier(0, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #edebe9;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.drawer-add-btn {
+  background: transparent;
+  border: none;
+  color: var(--primary-purple);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.drawer-add-btn:hover {
+  background: var(--primary-purple-light);
+}
+
+.drawer-list {
+  overflow-y: auto;
+  max-height: 220px;
+  padding: 4px 0;
+}
+
+.notebook-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-main);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.notebook-item:hover {
+  background: #f3f2f1;
+}
+
+.notebook-item.active {
+  background: var(--primary-purple-light);
+  color: var(--primary-purple);
+  font-weight: 600;
+  border-left: 3px solid var(--primary-purple);
+}
+
+.notebook-item-icon {
+  font-size: 15px;
+}
+
+.notebook-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
 
 .canvas-viewport {
   flex: 1;
   position: relative;
   overflow: auto;
-  background-color: #f4f5f7;
+  background-color: var(--bg-page);
   outline: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.canvas-viewport::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.canvas-viewport.show-grid {
+  background-image: 
+    linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Translucent Ghost Spatial Scrollbars */
+.ghost-scrollbar {
+  position: absolute;
+  background: var(--ghost-scrollbar-bg);
+  border-radius: 6px;
+  z-index: 85;
+  opacity: 0.35;
+  transition: opacity 0.25s ease, background 0.2s ease;
+  user-select: none;
+}
+
+.ghost-scrollbar:hover,
+.ghost-scrollbar.active {
+  opacity: 0.95;
+  background: var(--ghost-scrollbar-hover);
+}
+
+.ghost-scrollbar-h {
+  bottom: 8px;
+  left: 20px;
+  right: 28px;
+  height: 8px;
+}
+
+.ghost-scrollbar-v {
+  top: 20px;
+  right: 8px;
+  bottom: 28px;
+  width: 8px;
+}
+
+.ghost-scrollbar-thumb {
+  position: absolute;
+  background: var(--ghost-scrollbar-thumb);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.ghost-scrollbar-thumb:hover,
+.ghost-scrollbar-thumb.dragging {
+  background: var(--ghost-scrollbar-thumb-hover);
+}
+
+.ghost-scrollbar-h .ghost-scrollbar-thumb {
+  height: 100%;
+  top: 0;
+}
+
+.ghost-scrollbar-v .ghost-scrollbar-thumb {
+  width: 100%;
+  left: 0;
 }
 
 .canvas-stage {
@@ -171,7 +899,7 @@ body {
   min-height: 2400px;
   transform-origin: 0 0;
   transition: width 0.1s ease, height 0.1s ease;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
 
 .canvas-stage.show-grid {
@@ -179,6 +907,16 @@ body {
     linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px),
     linear-gradient(to bottom, var(--grid-line-color) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* Radiant Marquee Multi-Selection Box */
+.marquee-selection-box {
+  position: absolute;
+  border: 1.5px dashed var(--marquee-border);
+  background-color: var(--marquee-bg);
+  pointer-events: none;
+  z-index: 100;
+  border-radius: 2px;
 }
 
 /* ==========================================================================
@@ -205,6 +943,11 @@ body {
 .note-box.selected {
   border-color: var(--onenote-active-border);
   box-shadow: 0 0 0 1px var(--onenote-active-border);
+}
+
+.note-box.multi-selected {
+  border-color: var(--guideline-blue) !important;
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.4), var(--card-shadow) !important;
 }
 
 /* Note Header Bar */
@@ -451,4 +1194,208 @@ body {
   cursor: nesw-resize;
   z-index: 20;
 }
+
+/* ==========================================================================
+   Storage Vault & Backup Hub (Light Theme Dialog)
+   ========================================================================== */
+
+.storage-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.storage-modal-overlay.active {
+  display: flex;
+}
+
+.storage-modal-card {
+  background: #ffffff;
+  width: 580px;
+  max-width: 92vw;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  border: 1px solid #edebe9;
+  overflow: hidden;
+  animation: storagePopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes storagePopIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.storage-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #edebe9;
+  background: #faf9f8;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-main);
+}
+
+.storage-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.storage-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.storage-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.stat-card {
+  background: #f9f9fb;
+  border: 1px solid #edebe9;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.stat-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.storage-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.active-badge {
+  background: #e8f5e9;
+  color: #1e7e34;
+  border: 1px solid #c3e6cb;
+}
+
+.neutral-badge {
+  background: #f1f1f1;
+  color: #666666;
+  border: 1px solid #d1d1d1;
+}
+
+.storage-section-block {
+  background: #faf9f8;
+  border: 1px solid #edebe9;
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.storage-block-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.storage-block-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  line-height: 1.45;
+}
+
+.storage-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Digital Inking Surfaces & Floating Mode Puck (Module D)
+   ========================================================================== */
+
+.ink-surface-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ink-surface-layer.under-text {
+  z-index: 2;
+  mix-blend-mode: multiply;
+}
+
+.ink-surface-layer.over-text {
+  z-index: 45;
+}
+
+body.ink-mode-active #active-draw-canvas {
+  cursor: crosshair;
+}
+
+/* Eraser Translucent Cursor Guide */
+.eraser-guide {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(119, 25, 170, 0.75);
+  background: rgba(119, 25, 170, 0.14);
+  pointer-events: none;
+  z-index: 60;
+  display: none;
+  transform: translate(0, 0);
+}
+
+/* Shape Snapped Pulse Pill */
+.shape-snap-pill {
+  position: absolute;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(119, 25, 170, 0.95);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 70;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.shape-snap-pill.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
 

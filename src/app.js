@@ -19,6 +19,7 @@ class OneNoteApp {
   init() {
     // 1. Initialize Subsystems
     this.canvas = new OneNoteCanvas('canvas-viewport', 'canvas-stage');
+    this.canvas.app = this;
     this.tableModule = new TableModule(this);
     this.imageModule = new ImageModule(this);
     this.mathModule = new MathModule(this);
@@ -26,6 +27,10 @@ class OneNoteApp {
     this.flowEngine = new ElementFlowEngine(this);
     this.keyboardController = new KeyboardController(this);
     this.history = new HistoryManager(this);
+    this.storageVault = new StorageVault(this);
+    this.ribbonController = new RibbonController(this);
+    this.inkEngine = new InkEngine(this);
+    this.sidebar = new SidebarManager(this);
 
     // 2. Connect Canvas Callbacks
     this.canvas.onCanvasDoubleClicked = (x, y) => {
@@ -45,6 +50,9 @@ class OneNoteApp {
     } catch (_) {}
     this.seedStarterNotes();
     this.history.pushState('initial');
+    if (this.sidebar) {
+      this.sidebar.saveActivePage();
+    }
   }
 
   createNoteBox(x = 100, y = 100, width = 360, height = null, recordHistory = true) {
@@ -109,10 +117,15 @@ class OneNoteApp {
   }
 
   deselectAll() {
-    this.noteBoxes.forEach(b => b.setSelected(false));
-    document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => el.classList.remove('active-selected'));
+    this.noteBoxes.forEach(b => {
+      b.setSelected(false);
+      b.element.classList.remove('multi-selected');
+    });
     this.selectedNoteBox = null;
     this.activeSelection = null;
+    document.querySelectorAll('.image-card.active-selected, .table-wrapper.active-selected').forEach(el => {
+      el.classList.remove('active-selected');
+    });
     window.getSelection()?.removeAllRanges();
   }
 
@@ -255,7 +268,12 @@ class OneNoteApp {
     const bindFormat = (id, command) => {
       const btn = document.getElementById(id);
       if (btn) {
-        btn.onclick = () => document.execCommand(command, false, null);
+        btn.onclick = () => {
+          if (this.ribbonController) this.ribbonController.restoreSelection();
+          document.execCommand(command, false, null);
+          if (this.ribbonController) this.ribbonController.inspectCursor();
+          if (this.history) this.history.debouncePush(command);
+        };
       }
     };
     bindFormat('btn-bold', 'bold');
@@ -557,7 +575,22 @@ class OneNoteApp {
         }
       }
 
-      // 6. Headings (h1 - h6)
+      // 6. Blockquotes
+      if (tag === 'blockquote') {
+        let cleanHtml = node.innerHTML.replace(citationRegex, '').trim();
+        if (cleanHtml.length > 0) {
+          units.push({ type: 'callout', content: cleanHtml });
+          return;
+        }
+      }
+
+      // 7. Horizontal Divider
+      if (tag === 'hr') {
+        units.push({ type: 'divider' });
+        return;
+      }
+
+      // 8. Headings (h1 - h6)
       if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
         let cleanHtml = node.innerHTML.replace(citationRegex, '').trim();
         if (cleanHtml.length > 0) {
@@ -566,7 +599,7 @@ class OneNoteApp {
         }
       }
 
-      // 7. Bullet & Numbered Lists (ul, ol)
+      // 9. Bullet & Numbered Lists (ul, ol)
       if (tag === 'ul' || tag === 'ol') {
         let cleanHtml = node.innerHTML.replace(citationRegex, '').trim();
         if (cleanHtml.length > 0) {
@@ -575,7 +608,7 @@ class OneNoteApp {
         }
       }
 
-      // 8. Text containers (p, blockquote, pre, div, span, etc.)
+      // 10. Text containers (p, pre, div, span, etc.)
       let plainText = node.textContent.replace(citationRegex, '').trim();
 
       // Check for standalone display math formula wrapped in <p> or <div> (Wikipedia style)
@@ -638,14 +671,23 @@ class OneNoteApp {
         return;
       }
 
-      // In-place Markdown Image detection (e.g. ![Alt](url))
+      // In-place Markdown Image detection (handles standard, unflagged AI images, and mixed text)
       if (this.markdownModule) {
-        const imgInfo = this.markdownModule.extractImageFromText(plainText);
-        if (imgInfo) {
-          units.push({
-            type: 'image',
-            src: imgInfo.src,
-            caption: imgInfo.caption
+        const segments = this.markdownModule.segmentTextAndImages(plainText);
+        if (segments && segments.some(s => s.type === 'image')) {
+          segments.forEach(seg => {
+            if (seg.type === 'image') {
+              units.push({
+                type: 'image',
+                src: seg.src,
+                caption: seg.caption
+              });
+            } else if (seg.content && seg.content.trim().length > 0) {
+              units.push({
+                type: 'text',
+                content: this.markdownModule.formatInline(seg.content.trim())
+              });
+            }
           });
           return;
         }
@@ -693,6 +735,78 @@ class OneNoteApp {
         newBlock = this.tableModule.createTableFromDOM(unit.domElement);
       } else if (unit.type === 'math') {
         newBlock = this.mathModule.createMathBlock(unit.latex, unit.rawMathML || null);
+      } else if (unit.type === 'callout') {
+        newBlock = document.createElement('div');
+        newBlock.className = 'canvas-block callout-block';
+        newBlock.dataset.blockType = 'callout';
+
+        const grip = document.createElement('div');
+        grip.className = 'block-grip';
+        grip.contentEditable = 'false';
+        grip.textContent = ':::';
+        grip.title = 'Drag to rearrange or drag out to detach';
+        newBlock.appendChild(grip);
+
+        const card = document.createElement('div');
+        card.className = 'callout-card';
+        card.innerHTML = `<span class="callout-icon" contenteditable="false">💡</span><div class="callout-content" contenteditable="true">${unit.content || ''}</div>`;
+        this.mathModule.renderInlineMath(card.querySelector('.callout-content'));
+        newBlock.appendChild(card);
+      } else if (unit.type === 'divider') {
+        newBlock = document.createElement('div');
+        newBlock.className = 'canvas-block divider-block';
+        newBlock.dataset.blockType = 'divider';
+        newBlock.contentEditable = 'false';
+
+        const grip = document.createElement('div');
+        grip.className = 'block-grip';
+        grip.contentEditable = 'false';
+        grip.textContent = ':::';
+        grip.title = 'Drag to rearrange or drag out to detach';
+        newBlock.appendChild(grip);
+
+        const hr = document.createElement('hr');
+        hr.className = 'canvas-divider';
+        newBlock.appendChild(hr);
+      } else if (unit.type === 'task-list') {
+        newBlock = document.createElement('div');
+        newBlock.className = 'canvas-block task-list-block';
+        newBlock.dataset.blockType = 'task-list';
+
+        const grip = document.createElement('div');
+        grip.className = 'block-grip';
+        grip.contentEditable = 'false';
+        grip.textContent = ':::';
+        grip.title = 'Drag to rearrange or drag out to detach';
+        newBlock.appendChild(grip);
+
+        const container = document.createElement('div');
+        container.className = 'task-items-container';
+        (unit.items || []).forEach(item => {
+          const row = document.createElement('div');
+          row.className = `task-row ${item.checked ? 'completed' : ''}`;
+          
+          const chk = document.createElement('input');
+          chk.type = 'checkbox';
+          chk.className = 'task-chk';
+          chk.checked = !!item.checked;
+          chk.contentEditable = 'false';
+          chk.onchange = () => {
+            row.classList.toggle('completed', chk.checked);
+            if (this.history) this.history.debouncePush('toggle_task');
+          };
+
+          const textSpan = document.createElement('span');
+          textSpan.className = 'task-text';
+          textSpan.contentEditable = 'true';
+          textSpan.innerHTML = item.text || '';
+          this.mathModule.renderInlineMath(textSpan);
+
+          row.appendChild(chk);
+          row.appendChild(textSpan);
+          container.appendChild(row);
+        });
+        newBlock.appendChild(container);
       } else if (unit.type === 'heading') {
         newBlock = document.createElement('div');
         newBlock.className = 'canvas-block text-block heading-block';

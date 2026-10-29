@@ -1940,6 +1940,9 @@ where:
     // TEST 59: Tablet Touch Dragging on Note Box Header
     console.log('\n--- 59. Tablet Touch Dragging on Note Box Header ---');
     const touchDragCardResult = await page.evaluate(async () => {
+      window.app.canvas.viewport.scrollLeft = 0;
+      window.app.canvas.viewport.scrollTop = 0;
+      await new Promise(r => setTimeout(r, 20));
       const box = window.app.noteBoxes[0];
       const initialX = box.x;
       const initialY = box.y;
@@ -2136,6 +2139,41 @@ where:
       return palmRejected && penRecorded && penValid && isFingerMode && fingerRecorded;
     });
     assert(pencilOnlyResult, 'Pencil Only mode rejects accidental finger/palm contact while recording Apple Pencil/stylus strokes');
+
+    // TEST 62: Cross-Device Responsive Layout & Mobile Drawer
+    console.log('\n--- 62. Cross-Device Responsive Layout & Mobile Drawer ---');
+    // 1. Simulate Mobile Viewport (iPhone 14: 390 x 844)
+    await page.setViewport({ width: 390, height: 844 });
+    const mobileLayoutResult = await page.evaluate(async () => {
+      const ribbon = document.querySelector('.ribbon-bar');
+      const ribbonStyle = window.getComputedStyle(ribbon);
+      const isRibbonScrollable = ribbonStyle.overflowX === 'auto';
+
+      const sidebar = document.getElementById('app-sidebar');
+      const toggleBtn = document.getElementById('btn-toggle-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+
+      // Ensure sidebar starts collapsed in mobile drawer mode
+      if (!sidebar.classList.contains('collapsed')) {
+        toggleBtn.click();
+      }
+
+      // In small screen mode, opening sidebar activates mobile backdrop
+      toggleBtn.click();
+      const isDrawerOpen = !sidebar.classList.contains('collapsed');
+      const isBackdropActive = backdrop.classList.contains('active');
+
+      // Tapping backdrop closes the drawer
+      backdrop.click();
+      const isDrawerClosed = sidebar.classList.contains('collapsed');
+      const isBackdropInactive = !backdrop.classList.contains('active');
+
+      return isRibbonScrollable && isDrawerOpen && isBackdropActive && isDrawerClosed && isBackdropInactive;
+    });
+    assert(mobileLayoutResult, 'Mobile layout provides swipeable ribbon, slide-away drawer sidebar, and backdrop overlay');
+
+    // Restore desktop viewport
+    await page.setViewport({ width: 1440, height: 900 });
 
 
 

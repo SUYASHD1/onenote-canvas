@@ -74,6 +74,12 @@ class SidebarManager {
   init() {
     this.bindControls();
     this.render();
+    if (window.innerWidth <= 900 && this.sidebarEl) {
+      this.sidebarEl.classList.add('collapsed');
+      if (this.toggleBtn) {
+        this.toggleBtn.classList.remove('active');
+      }
+    }
   }
 
   bindControls() {
@@ -114,6 +120,16 @@ class SidebarManager {
     if (btnAddPage) {
       btnAddPage.onclick = () => this.createPage();
     }
+
+    // 4. Mobile Backdrop Overlay Click
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (backdrop) {
+      backdrop.onclick = () => {
+        if (!this.sidebarEl.classList.contains('collapsed')) {
+          this.toggleSidebar();
+        }
+      };
+    }
   }
 
   toggleSidebar() {
@@ -122,6 +138,10 @@ class SidebarManager {
     const isCollapsed = this.sidebarEl.classList.contains('collapsed');
     if (this.toggleBtn) {
       this.toggleBtn.classList.toggle('active', !isCollapsed);
+    }
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (backdrop) {
+      backdrop.classList.toggle('active', !isCollapsed && window.innerWidth <= 900);
     }
     setTimeout(() => {
       if (this.app.canvas) {
@@ -220,6 +240,11 @@ class SidebarManager {
     }
 
     this.render();
+
+    // Auto-close drawer on small screens when page is selected
+    if (window.innerWidth <= 900 && this.sidebarEl && !this.sidebarEl.classList.contains('collapsed')) {
+      this.toggleSidebar();
+    }
   }
 
   createPage(title = null) {

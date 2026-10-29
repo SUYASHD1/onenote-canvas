@@ -823,6 +823,8 @@ body {
   overflow: hidden;
   width: 100%;
   height: 100%;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .canvas-viewport {
@@ -903,6 +905,8 @@ body {
   min-height: 2400px;
   transform-origin: 0 0;
   box-shadow: none;
+  touch-action: none !important;
+  -webkit-touch-callout: none;
 }
 
 .canvas-stage.show-grid {

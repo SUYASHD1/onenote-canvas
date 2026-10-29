@@ -128,9 +128,8 @@ class InkEngine {
       if (homeContent) homeContent.style.display = 'none';
       if (drawContent) drawContent.style.display = 'flex';
 
-      // Switch to pen mode and lock canvas for accidental touch protection
+      // Switch to pen mode (pencil-only mode keeps fingers free to pan and zoom)
       this.setMode('pen');
-      this.setCanvasLock(true);
     } else {
       if (tabHome) tabHome.classList.add('active');
       if (tabDraw) tabDraw.classList.remove('active');
@@ -342,6 +341,11 @@ class InkEngine {
         canvas.setPointerCapture(e.pointerId);
       } catch (_) {}
 
+      // Cache bounding rect once on contact to eliminate layout thrashing during stroke movement
+      this.activeCanvasRect = canvas.getBoundingClientRect();
+      this.activeScaleX = canvas.width / (this.activeCanvasRect.width || 1);
+      this.activeScaleY = canvas.height / (this.activeCanvasRect.height || 1);
+
       const pos = this.getCanvasCoords(e);
       this.isDrawing = true;
       this.lastPointerPos = pos;
@@ -387,6 +391,7 @@ class InkEngine {
       // Apple Pencil & S-Pen Coalesced Events: Pull high-frequency 240Hz intermediate points
       const coalesced = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
       const eventsList = (coalesced && coalesced.length > 0) ? coalesced : [e];
+      const startLen = this.currentStroke.points.length;
 
       for (let i = 0; i < eventsList.length; i++) {
         const subEvent = eventsList[i];
@@ -402,9 +407,10 @@ class InkEngine {
         }
 
         this.currentStroke.points.push({ x: subPos.x, y: subPos.y, p: subEvent.pressure || 0.5 });
-        // Buttery smooth incremental segment rendering (0ms lag, no full-canvas clears)
-        this.drawLatestSegment(this.currentStroke);
       }
+
+      // Render all intermediate segments in a single batched GPU draw call
+      this.drawBatchSegments(this.currentStroke, startLen);
     });
 
     const stopDrawing = (e) => {
@@ -415,6 +421,9 @@ class InkEngine {
       this.activePointerId = null;
       this.isDrawing = false;
       this.clearShapeHoldTimer();
+      this.activeCanvasRect = null;
+      this.activeScaleX = null;
+      this.activeScaleY = null;
 
       try {
         if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) {
@@ -437,9 +446,9 @@ class InkEngine {
   }
 
   getCanvasCoords(e) {
-    const rect = this.inkCanvas.getBoundingClientRect();
-    const scaleX = this.inkCanvas.width / (rect.width || 1);
-    const scaleY = this.inkCanvas.height / (rect.height || 1);
+    const rect = this.activeCanvasRect || this.inkCanvas.getBoundingClientRect();
+    const scaleX = this.activeScaleX || (this.inkCanvas.width / (rect.width || 1));
+    const scaleY = this.activeScaleY || (this.inkCanvas.height / (rect.height || 1));
     return {
       x: Math.round((e.clientX - rect.left) * scaleX),
       y: Math.round((e.clientY - rect.top) * scaleY)
@@ -630,6 +639,46 @@ class InkEngine {
     ctx.beginPath();
     ctx.arc(pt.x, pt.y, stroke.width / 2, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+  }
+
+  drawBatchSegments(stroke, fromIndex) {
+    const pts = stroke.points;
+    const len = pts.length;
+    if (len < 2) return;
+
+    const isHighlighter = stroke.tool === 'highlighter';
+    const ctx = isHighlighter ? this.highlighterCtx : this.inkCtx;
+
+    ctx.save();
+    ctx.strokeStyle = this.resolveDisplayColor(stroke.color, stroke.tool);
+    ctx.lineWidth = stroke.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (isHighlighter) {
+      ctx.globalCompositeOperation = this.isDarkMode() ? 'screen' : 'multiply';
+    }
+
+    ctx.beginPath();
+    const start = Math.max(1, fromIndex || 1);
+    for (let i = start; i < len; i++) {
+      if (i === 1) {
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(midX, midY);
+      } else {
+        const prevMidX = (pts[i - 2].x + pts[i - 1].x) / 2;
+        const prevMidY = (pts[i - 2].y + pts[i - 1].y) / 2;
+        const curMidX = (pts[i - 1].x + pts[i].x) / 2;
+        const curMidY = (pts[i - 1].y + pts[i].y) / 2;
+
+        ctx.moveTo(prevMidX, prevMidY);
+        ctx.quadraticCurveTo(pts[i - 1].x, pts[i - 1].y, curMidX, curMidY);
+      }
+    }
+    ctx.stroke();
     ctx.restore();
   }
 

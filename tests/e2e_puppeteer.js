@@ -1506,19 +1506,20 @@ where:
       const tabDraw = document.getElementById('tab-btn-draw');
       tabDraw.click();
 
-      // In Draw Mode, canvas panning and viewport scrolling are completely locked
+      // Test manual lock toggle button
+      const toggleBtn = document.getElementById('btn-toggle-canvas-lock');
+      toggleBtn.click(); // Turn lock ON
       const isLocked = window.app.canvas.isPanningLocked === true;
       const isOverflowHidden = window.app.canvas.viewport.style.overflow === 'hidden';
       const hasLockedClass = window.app.canvas.viewport.classList.contains('canvas-locked');
 
       // Unlock toggle works
-      const toggleBtn = document.getElementById('btn-toggle-canvas-lock');
-      toggleBtn.click();
+      toggleBtn.click(); // Turn lock OFF
       const wasUnlocked = window.app.canvas.isPanningLocked === false &&
                           window.app.canvas.viewport.style.overflow === 'scroll';
 
       // Re-lock
-      toggleBtn.click();
+      toggleBtn.click(); // Turn lock ON
       const reLocked = window.app.canvas.isPanningLocked === true &&
                        window.app.canvas.viewport.style.overflow === 'hidden';
 

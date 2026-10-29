@@ -136,6 +136,9 @@ class OneNoteCanvas {
         }
 
         activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        try {
+          this.viewport.setPointerCapture(e.pointerId);
+        } catch (_) {}
 
         if (activeTouches.size === 1) {
           touchStartTime = Date.now();
@@ -264,6 +267,12 @@ class OneNoteCanvas {
 
     const handleTouchPointerUp = (e) => {
       if (e.pointerType === 'touch') {
+        try {
+          if (this.viewport.hasPointerCapture && this.viewport.hasPointerCapture(e.pointerId)) {
+            this.viewport.releasePointerCapture(e.pointerId);
+          }
+        } catch (_) {}
+
         const touchDownPos = activeTouches.get(e.pointerId);
         activeTouches.delete(e.pointerId);
         if (activeTouches.size < 2) {
@@ -355,11 +364,12 @@ class OneNoteCanvas {
       }
     }, { passive: false });
 
-    // Touch event: passive listener allows Android & iOS to track touch at native 120Hz without delay.
-    // Viewport locking is handled natively by CSS touch-action: none and overflow: hidden.
+    // Block native browser scrolling so our kinetic panning & pinch-zoom engine has 100% exclusive, jitter-free control
     this.viewport.addEventListener('touchmove', (e) => {
-      // Passive listener ensures the browser compositor glides touch smoothly without main-thread blocking
-    }, { passive: true });
+      if (e.cancelable && !e.target.closest('input, textarea, select')) {
+        e.preventDefault();
+      }
+    }, { passive: false });
 
     // Sync ghost scrollbars and auto-expand infinite canvas on native viewport scrolling
     let scrollbarRafId = null;

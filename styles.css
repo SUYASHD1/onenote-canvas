@@ -1353,6 +1353,7 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  touch-action: none;
 }
 
 .ink-surface-layer.under-text {

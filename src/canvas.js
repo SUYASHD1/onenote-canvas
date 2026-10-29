@@ -71,6 +71,9 @@ class OneNoteCanvas {
     this.stage.style.height = `${this.effectiveHeight}px`;
     this.updateStatus();
     this.updateGhostScrollbars();
+    if (this.app && this.app.inkEngine && typeof this.app.inkEngine.syncCanvasSize === 'function') {
+      this.app.inkEngine.syncCanvasSize();
+    }
   }
 
   bindEvents() {
@@ -115,10 +118,21 @@ class OneNoteCanvas {
     this.viewport.addEventListener('pointerdown', (e) => {
       if (this.isPanningLocked) return;
 
+      if (e.pointerType === 'pen') {
+        return; // Stylus/pen inputs never pan the canvas viewport
+      }
+
       if (e.pointerType === 'touch') {
         // Disregard touches starting on note boxes, modals, scrollbars, or controls
         if (e.target.closest('.note-box, .crop-modal, .ghost-scrollbar, button, input, select, .ribbon-cluster')) {
           return;
+        }
+
+        // In ink mode: if pen is drawing, or if finger drawing is active, freeze viewport panning
+        if (this.app && this.app.inkEngine && this.app.inkEngine.mode !== 'navigate') {
+          if (this.app.inkEngine.isDrawing || !this.app.inkEngine.pencilOnly) {
+            return;
+          }
         }
 
         activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -173,6 +187,10 @@ class OneNoteCanvas {
 
     window.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'touch') {
+        if (this.app && this.app.inkEngine && this.app.inkEngine.isDrawing) {
+          return; // Ignore resting palm slide while actively drawing with pen
+        }
+
         if (activeTouches.has(e.pointerId)) {
           activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         }

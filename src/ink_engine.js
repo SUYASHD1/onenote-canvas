@@ -29,6 +29,8 @@ class InkEngine {
     this.highlighterWidth = 22;
     this.eraserRadius = 14;
     this.isCanvasLocked = false;
+    this.pencilOnly = localStorage.getItem('onenote_pencil_only') !== '0'; // Defaults to Pencil Only
+    this.activePointerId = null;
 
     this.strokes = []; // Vector storage of strokes
     this.currentStroke = null;
@@ -55,6 +57,7 @@ class InkEngine {
     this.highlighterCanvas = document.createElement('canvas');
     this.highlighterCanvas.id = 'highlighter-draw-canvas';
     this.highlighterCanvas.className = 'ink-surface-layer under-text';
+    this.highlighterCanvas.style.touchAction = 'none';
     this.highlighterCtx = this.highlighterCanvas.getContext('2d');
     stage.insertBefore(this.highlighterCanvas, stage.firstChild);
 
@@ -62,6 +65,7 @@ class InkEngine {
     this.inkCanvas = document.createElement('canvas');
     this.inkCanvas.id = 'active-draw-canvas';
     this.inkCanvas.className = 'ink-surface-layer over-text';
+    this.inkCanvas.style.touchAction = 'none';
     this.inkCtx = this.inkCanvas.getContext('2d');
     stage.appendChild(this.inkCanvas);
 
@@ -194,6 +198,13 @@ class InkEngine {
     if (btnMed) btnMed.onclick = () => setWidth(4, btnMed);
     if (btnThick) btnThick.onclick = () => setWidth(8, btnThick);
 
+    // Pencil Only / Stylus Mode Toggle
+    const btnPencilOnly = document.getElementById('btn-toggle-pencil-only');
+    if (btnPencilOnly) {
+      btnPencilOnly.onclick = () => this.setPencilOnly(!this.pencilOnly);
+    }
+    this.updatePencilOnlyUI();
+
     // Canvas Palm Lock Toggle
     const btnLock = document.getElementById('btn-toggle-canvas-lock');
     if (btnLock) {
@@ -247,6 +258,30 @@ class InkEngine {
     }
   }
 
+  setPencilOnly(enabled) {
+    this.pencilOnly = !!enabled;
+    try {
+      localStorage.setItem('onenote_pencil_only', this.pencilOnly ? '1' : '0');
+    } catch (_) {}
+    this.updatePencilOnlyUI();
+  }
+
+  updatePencilOnlyUI() {
+    const badge = document.getElementById('pencil-only-badge');
+    const btn = document.getElementById('btn-toggle-pencil-only');
+    if (btn && badge) {
+      if (this.pencilOnly) {
+        badge.textContent = '✏️ Pencil Only';
+        btn.classList.add('active');
+        btn.title = 'Pencil Only Active: Only Apple Pencil/Stylus writes ink. Fingers scroll or zoom without accidental ink.';
+      } else {
+        badge.textContent = '🖐️ Finger Drawing';
+        btn.classList.remove('active');
+        btn.title = 'Finger Drawing Active: Any touch or finger writes ink.';
+      }
+    }
+  }
+
   // --- Mode Switching ---
 
   setMode(newMode) {
@@ -287,7 +322,22 @@ class InkEngine {
 
     canvas.addEventListener('pointerdown', (e) => {
       if (this.mode === 'navigate') return;
+
+      // 1. Palm Rejection & Pencil Only Enforcement:
+      // When Pencil Only is active, reject finger touches.
+      // Only active stylus/pen ('pen') and desktop 'mouse' (or tests) are allowed to draw.
+      if (this.pencilOnly && e.pointerType === 'touch') {
+        return;
+      }
+
+      // 2. Secondary Touch Ignoral:
+      // If already drawing, ignore simultaneous secondary touches (e.g., resting palm or second finger)
+      if (this.isDrawing && this.activePointerId !== null && this.activePointerId !== e.pointerId) {
+        return;
+      }
+
       e.preventDefault();
+      this.activePointerId = e.pointerId;
       try {
         canvas.setPointerCapture(e.pointerId);
       } catch (_) {}
@@ -316,6 +366,9 @@ class InkEngine {
     });
 
     canvas.addEventListener('pointermove', (e) => {
+      if (this.pencilOnly && e.pointerType === 'touch') return;
+      if (this.isDrawing && this.activePointerId !== null && this.activePointerId !== e.pointerId) return;
+
       const pos = this.getCanvasCoords(e);
 
       // Update eraser cursor guide
@@ -347,8 +400,18 @@ class InkEngine {
 
     const stopDrawing = (e) => {
       if (!this.isDrawing) return;
+      if (this.activePointerId !== null && e.pointerId !== undefined && e.pointerId !== this.activePointerId) {
+        return;
+      }
+      this.activePointerId = null;
       this.isDrawing = false;
       this.clearShapeHoldTimer();
+
+      try {
+        if (canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch (_) {}
 
       if (this.currentStroke && this.currentStroke.points.length > 0) {
         if (this.currentStroke.points.length > 1 && !this.currentStroke.shape) {
@@ -365,12 +428,12 @@ class InkEngine {
   }
 
   getCanvasCoords(e) {
-    const stage = document.getElementById('canvas-stage');
-    const rect = stage.getBoundingClientRect();
-    const zoom = this.app.canvas ? this.app.canvas.zoomLevel : 1;
+    const rect = this.inkCanvas.getBoundingClientRect();
+    const scaleX = this.inkCanvas.width / (rect.width || 1);
+    const scaleY = this.inkCanvas.height / (rect.height || 1);
     return {
-      x: (e.clientX - rect.left) / zoom,
-      y: (e.clientY - rect.top) / zoom
+      x: Math.round((e.clientX - rect.left) * scaleX),
+      y: Math.round((e.clientY - rect.top) * scaleY)
     };
   }
 

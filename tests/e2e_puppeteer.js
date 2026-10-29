@@ -2028,6 +2028,115 @@ where:
     });
     assert(touchResizeResult, 'Finger touch drag on 8-point corner handle smoothly resizes note box dimensions');
 
+    // TEST 61: Pencil Only Mode Palm Rejection & Pixel-Accurate Stylus Inking
+    console.log('\n--- 61. Pencil Only Mode Palm Rejection & Stylus Inking ---');
+    const pencilOnlyResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      ink.setMode('pen');
+      ink.setPencilOnly(true);
+
+      const canvas = ink.inkCanvas;
+      const initialStrokesCount = ink.strokes.length;
+
+      // 1. Simulate resting palm / finger touch: MUST be rejected in pencil-only mode
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 501,
+        pointerType: 'touch',
+        clientX: 250,
+        clientY: 250
+      }));
+      canvas.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 501,
+        pointerType: 'touch',
+        clientX: 280,
+        clientY: 280
+      }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 501,
+        pointerType: 'touch',
+        clientX: 280,
+        clientY: 280
+      }));
+
+      const palmRejected = ink.strokes.length === initialStrokesCount;
+
+      // 2. Simulate Apple Pencil / Stylus: MUST ink smoothly
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 502,
+        pointerType: 'pen',
+        clientX: 300,
+        clientY: 300,
+        pressure: 0.75
+      }));
+      canvas.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 502,
+        pointerType: 'pen',
+        clientX: 350,
+        clientY: 350,
+        pressure: 0.85
+      }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 502,
+        pointerType: 'pen',
+        clientX: 350,
+        clientY: 350
+      }));
+
+      const penRecorded = ink.strokes.length === initialStrokesCount + 1;
+      const lastStroke = ink.strokes[ink.strokes.length - 1];
+      const penValid = lastStroke && lastStroke.tool === 'pen' && lastStroke.points.length >= 2;
+
+      // 3. Test Toggle to Finger Drawing
+      ink.setPencilOnly(false);
+      const isFingerMode = ink.pencilOnly === false;
+
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 503,
+        pointerType: 'touch',
+        clientX: 400,
+        clientY: 400
+      }));
+      canvas.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 503,
+        pointerType: 'touch',
+        clientX: 420,
+        clientY: 420
+      }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 503,
+        pointerType: 'touch',
+        clientX: 420,
+        clientY: 420
+      }));
+
+      const fingerRecorded = ink.strokes.length === initialStrokesCount + 2;
+
+      // Restore Pencil Only default & reset to navigate mode
+      ink.setPencilOnly(true);
+      ink.setMode('navigate');
+
+      return palmRejected && penRecorded && penValid && isFingerMode && fingerRecorded;
+    });
+    assert(pencilOnlyResult, 'Pencil Only mode rejects accidental finger/palm contact while recording Apple Pencil/stylus strokes');
+
 
 
 

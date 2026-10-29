@@ -58,11 +58,7 @@ class InkEngine {
     this.highlighterCanvas.id = 'highlighter-draw-canvas';
     this.highlighterCanvas.className = 'ink-surface-layer under-text';
     this.highlighterCanvas.style.touchAction = 'none';
-    try {
-      this.highlighterCtx = this.highlighterCanvas.getContext('2d', { desynchronized: true });
-    } catch (_) {
-      this.highlighterCtx = this.highlighterCanvas.getContext('2d');
-    }
+    this.highlighterCtx = this.highlighterCanvas.getContext('2d');
     stage.insertBefore(this.highlighterCanvas, stage.firstChild);
 
     // 2. Main Inking Canvas (Layered for Pen & Eraser, z-index: 45)
@@ -70,11 +66,7 @@ class InkEngine {
     this.inkCanvas.id = 'active-draw-canvas';
     this.inkCanvas.className = 'ink-surface-layer over-text';
     this.inkCanvas.style.touchAction = 'none';
-    try {
-      this.inkCtx = this.inkCanvas.getContext('2d', { desynchronized: true });
-    } catch (_) {
-      this.inkCtx = this.inkCanvas.getContext('2d');
-    }
+    this.inkCtx = this.inkCanvas.getContext('2d');
     stage.appendChild(this.inkCanvas);
 
     // 3. Eraser Cursor Guide Element
@@ -377,11 +369,9 @@ class InkEngine {
       this.startShapeHoldTimer();
     });
 
-    let lastEventTimeStamp = 0;
     const handlePointerMove = (e) => {
-      if (e.timeStamp && e.timeStamp === lastEventTimeStamp) return;
-      if (e.timeStamp) lastEventTimeStamp = e.timeStamp;
-
+      // Fast path: ignore hover movements unless drawing or actively guiding eraser
+      if (!this.isDrawing && this.mode !== 'eraser') return;
       if (this.pencilOnly && e.pointerType === 'touch') return;
       if (this.isDrawing && this.activePointerId !== null && this.activePointerId !== e.pointerId) return;
 
@@ -400,7 +390,7 @@ class InkEngine {
         return;
       }
 
-      // Apple Pencil & S-Pen Coalesced Events: Pull high-frequency 240Hz intermediate points
+      // Apple Pencil & Stylus Coalesced Events: Pull high-frequency intermediate points cleanly
       const coalesced = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
       const eventsList = (coalesced && coalesced.length > 0) ? coalesced : [e];
       const startLen = this.currentStroke.points.length;
@@ -421,13 +411,10 @@ class InkEngine {
         this.currentStroke.points.push({ x: subPos.x, y: subPos.y, p: subEvent.pressure || 0.5 });
       }
 
-      // Render all intermediate segments in a single batched GPU draw call
+      // Render intermediate segments in a single GPU pass
       this.drawBatchSegments(this.currentStroke, startLen);
     };
 
-    if ('onpointerrawupdate' in window) {
-      canvas.addEventListener('pointerrawupdate', handlePointerMove);
-    }
     canvas.addEventListener('pointermove', handlePointerMove);
 
     const stopDrawing = (e) => {

@@ -57,9 +57,10 @@ class ImageModule {
     });
 
     // Dragging by grabbing the image itself moves the ENTIRE block (image + caption + tools)
-    img.addEventListener('mousedown', (e) => {
+    img.style.touchAction = 'none';
+    const onImgDragStart = (e) => {
       e.stopPropagation();
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       this.app.selectObject(card, 'image');
 
       const parentBoxEl = block.closest('.note-box');
@@ -72,7 +73,9 @@ class ImageModule {
           startY: e.clientY
         };
       }
-    });
+    };
+    img.addEventListener('pointerdown', onImgDragStart);
+    img.addEventListener('mousedown', onImgDragStart);
 
     // Floating Tools Bar (Crop, Delete)
     const tools = document.createElement('div');
@@ -313,8 +316,10 @@ class ImageModule {
     let startRect = null;
 
     // Moving the whole crop box
-    this.cropBox.addEventListener('mousedown', (e) => {
+    this.cropBox.style.touchAction = 'none';
+    const onCropBoxStart = (e) => {
       if (e.target.classList.contains('crop-handle')) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       isMoving = true;
       startX = e.clientX;
       startY = e.clientY;
@@ -324,15 +329,19 @@ class ImageModule {
         width: this.cropBox.offsetWidth,
         height: this.cropBox.offsetHeight
       };
-      e.preventDefault();
-    });
+      if (e.cancelable) e.preventDefault();
+    };
+    this.cropBox.addEventListener('pointerdown', onCropBoxStart);
+    this.cropBox.addEventListener('mousedown', onCropBoxStart);
 
     // Resizing via crop handles
     const handles = this.cropBox.querySelectorAll('.crop-handle');
     handles.forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
+      handle.style.touchAction = 'none';
+      const onCropHandleStart = (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.stopPropagation();
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         isResizing = true;
         activeHandle = handle.dataset.handle;
         startX = e.clientX;
@@ -343,10 +352,12 @@ class ImageModule {
           width: this.cropBox.offsetWidth,
           height: this.cropBox.offsetHeight
         };
-      });
+      };
+      handle.addEventListener('pointerdown', onCropHandleStart);
+      handle.addEventListener('mousedown', onCropHandleStart);
     });
 
-    window.addEventListener('mousemove', (e) => {
+    const onCropMove = (e) => {
       const container = document.getElementById('crop-stage-container');
       if (!container) return;
       const maxW = container.offsetWidth;
@@ -388,13 +399,19 @@ class ImageModule {
         this.cropBox.style.width = `${width}px`;
         this.cropBox.style.height = `${height}px`;
       }
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
+    const onCropEnd = () => {
       isMoving = false;
       isResizing = false;
       activeHandle = null;
-    });
+    };
+
+    window.addEventListener('mousemove', onCropMove);
+    window.addEventListener('mouseup', onCropEnd);
+    window.addEventListener('pointermove', onCropMove);
+    window.addEventListener('pointerup', onCropEnd);
+    window.addEventListener('pointercancel', onCropEnd);
   }
 }
 

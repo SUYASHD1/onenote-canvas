@@ -1523,6 +1523,7 @@ where:
                        window.app.canvas.viewport.style.overflow === 'hidden';
 
       document.getElementById('tab-btn-home').click();
+      window.app.canvas.setLocked(false);
       return isLocked && isOverflowHidden && hasLockedClass && wasUnlocked && reLocked;
     });
     assert(palmLockResult, 'Canvas Palm Lock freezes viewport scrolling and gestures against accidental touch');
@@ -1534,6 +1535,498 @@ where:
       return puck === null;
     });
     assert(cleanWorkspaceResult, 'Floating mode puck is completely removed from the workspace for an unhindered canvas');
+
+    // TEST 50: Executive Dark Mode & OneNote Purple System
+    console.log('\n--- 50. Executive Dark Mode & OneNote Purple System ---');
+    const darkModeResult = await page.evaluate(() => {
+      const toggleBtn = document.getElementById('btn-toggle-theme');
+      const iconSpan = document.getElementById('theme-toggle-icon');
+      if (!toggleBtn || !iconSpan) return false;
+
+      // 1. Initial State (Light Mode)
+      const initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      const initialIcon = iconSpan.textContent.trim();
+
+      // 2. Click to toggle to Dark Mode
+      toggleBtn.click();
+      const darkTheme = document.documentElement.getAttribute('data-theme');
+      const darkIcon = iconSpan.textContent.trim();
+      const darkStorage = localStorage.getItem('onenote_theme');
+
+      // Check canvas viewport and card styling under dark theme
+      const viewportBg = window.getComputedStyle(document.querySelector('.canvas-viewport')).backgroundColor;
+      const cardBg = window.getComputedStyle(document.querySelector('.note-box')).backgroundColor;
+
+      // 3. Click again to return to Light Mode
+      toggleBtn.click();
+      const revertedTheme = document.documentElement.getAttribute('data-theme');
+      const revertedIcon = iconSpan.textContent.trim();
+      const revertedStorage = localStorage.getItem('onenote_theme');
+
+      return (
+        initialTheme === 'light' &&
+        initialIcon === '🌙' &&
+        darkTheme === 'dark' &&
+        darkIcon === '☀️' &&
+        darkStorage === 'dark' &&
+        revertedTheme === 'light' &&
+        revertedIcon === '🌙' &&
+        revertedStorage === 'light'
+      );
+    });
+    assert(darkModeResult, 'Executive Dark Mode toggles seamlessly, changes icon to ☀️, persists to localStorage, and reverts to Daylight 🌙');
+
+    // TEST 51: Smart Pen & Highlighter Inversion on Theme Switch
+    console.log('\n--- 51. Smart Pen & Highlighter Color Inversion ---');
+    const inkInversionResult = await page.evaluate(() => {
+      const ink = window.app.inkEngine;
+      const toggleBtn = document.getElementById('btn-toggle-theme');
+      const slot0Tip = document.querySelector('#pen-slot-0 .pen-slot-tip');
+
+      // 1. Ensure Light Mode
+      window.app.setTheme('light');
+
+      // Verify daylight ink resolution
+      const lightPen = ink.resolveDisplayColor('#111111', 'pen');
+      const lightHighlighter = ink.resolveDisplayColor('rgba(255, 235, 59, 0.65)', 'highlighter');
+      const lightSlot0Bg = slot0Tip.style.backgroundColor;
+
+      // 2. Switch to Dark Mode
+      window.app.setTheme('dark');
+
+      const darkPen = ink.resolveDisplayColor('#111111', 'pen');
+      const darkHighlighter = ink.resolveDisplayColor('rgba(255, 235, 59, 0.65)', 'highlighter');
+      const darkSlot0Bg = slot0Tip.style.backgroundColor;
+
+      // 3. Switch back to Light Mode
+      window.app.setTheme('light');
+
+      const revertedPen = ink.resolveDisplayColor('#111111', 'pen');
+      const revertedSlot0Bg = slot0Tip.style.backgroundColor;
+
+      return (
+        lightPen === '#111111' &&
+        lightHighlighter === 'rgba(255, 235, 59, 0.65)' &&
+        darkPen === '#f5f5f5' &&
+        darkHighlighter === 'rgba(255, 225, 90, 0.65)' &&
+        (darkSlot0Bg === 'rgb(245, 245, 245)' || darkSlot0Bg === '#f5f5f5') &&
+        revertedPen === '#111111' &&
+        (revertedSlot0Bg === 'rgb(17, 17, 17)' || revertedSlot0Bg === '#111111')
+      );
+    });
+    assert(inkInversionResult, 'Smart pen & highlighter automatically invert black to cream-white and pastels to luminous glow in dark mode, and restore in daylight');
+
+    // TEST 52: Midnight Glow Text Highlighter Inversion (Option A)
+    console.log('\n--- 52. Midnight Glow Text Highlighter Inversion ---');
+    const textHighlightResult = await page.evaluate(() => {
+      // 1. Create a test card with highlighted text
+      const box = window.app.createNoteBox(200, 200, 320);
+      const block = box.addTextBlock('Test Highlight Line');
+      const editable = block.querySelector('[contenteditable="true"]');
+      editable.innerHTML = 'Hover on the <span id="test-yellow-highlight" style="background-color: rgb(255, 245, 157);">yellow text</span> and <span id="test-pink-highlight" style="background-color: rgb(248, 187, 208);">pink text</span>.';
+
+      const yellowSpan = document.getElementById('test-yellow-highlight');
+      const pinkSpan = document.getElementById('test-pink-highlight');
+
+      // 2. In Daylight Mode: check bright pastel background
+      window.app.setTheme('light');
+      const lightYellowBg = window.getComputedStyle(yellowSpan).backgroundColor;
+      const lightPinkBg = window.getComputedStyle(pinkSpan).backgroundColor;
+
+      // 3. In Dark Mode: check midnight glow background & white text
+      window.app.setTheme('dark');
+      const darkYellowBg = window.getComputedStyle(yellowSpan).backgroundColor;
+      const darkYellowColor = window.getComputedStyle(yellowSpan).color;
+      const darkPinkBg = window.getComputedStyle(pinkSpan).backgroundColor;
+      const darkPinkColor = window.getComputedStyle(pinkSpan).color;
+
+      // 4. Return to Daylight Mode
+      window.app.setTheme('light');
+      const revertedYellowBg = window.getComputedStyle(yellowSpan).backgroundColor;
+
+      // Clean up test box
+      box.destroy();
+
+      const isDarkYellowGlow = darkYellowBg.includes('255, 214, 0') || darkYellowBg.includes('0.28');
+      const isDarkPinkGlow = darkPinkBg.includes('244, 114, 182') || darkPinkBg.includes('0.32');
+      const isTextCrispWhite = darkYellowColor === 'rgb(237, 237, 237)' && darkPinkColor === 'rgb(237, 237, 237)';
+
+      return isDarkYellowGlow && isDarkPinkGlow && isTextCrispWhite && revertedYellowBg.includes('255, 245, 157');
+    });
+    assert(textHighlightResult, 'Text highlights automatically transform into midnight amber/ruby glow with crisp white text in dark mode (Option A)');
+
+    // TEST 53: Standalone PWA Installation & Manifest Verification
+    console.log('\n--- 53. Standalone PWA Installation & Manifest Verification ---');
+    const pwaResult = await page.evaluate(() => {
+      const manifestLink = document.querySelector('link[rel="manifest"]');
+      const appleIconLink = document.querySelector('link[rel="apple-touch-icon"]');
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+      const appleMobileMeta = document.querySelector('meta[name="apple-mobile-web-app-capable"]');
+
+      const hasManifest = manifestLink && manifestLink.getAttribute('href') === 'manifest.json';
+      const hasAppleIcon = appleIconLink && appleIconLink.getAttribute('href') === 'icon-192.png';
+      const hasThemeColor = themeColorMeta && themeColorMeta.getAttribute('content') === '#7719aa';
+      const isAppleCapable = appleMobileMeta && appleMobileMeta.getAttribute('content') === 'yes';
+
+      return hasManifest && hasAppleIcon && hasThemeColor && isAppleCapable;
+    });
+
+    const fs = require('fs');
+    const manifestExists = fs.existsSync(path.resolve(__dirname, '../manifest.json'));
+    const iconSvgExists = fs.existsSync(path.resolve(__dirname, '../icon.svg'));
+    const icon192Exists = fs.existsSync(path.resolve(__dirname, '../icon-192.png'));
+    const icon512Exists = fs.existsSync(path.resolve(__dirname, '../icon-512.png'));
+    let manifestData = {};
+    if (manifestExists) {
+      manifestData = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../manifest.json'), 'utf8'));
+    }
+
+    const isStandalonePWA = pwaResult &&
+      manifestExists &&
+      iconSvgExists &&
+      icon192Exists &&
+      icon512Exists &&
+      manifestData.display === 'standalone' &&
+      manifestData.theme_color === '#7719aa' &&
+      manifestData.icons &&
+      manifestData.icons.length >= 3;
+
+    assert(isStandalonePWA, 'Standalone PWA manifest is valid with standalone display mode, #7719aa theme color, and high-res icons (SVG, 192px, 512px)');
+
+    // TEST 54: 100% Offline Airplane Mode Service Worker (sw.js)
+    console.log('\n--- 54. 100% Offline Airplane Mode Service Worker (sw.js) ---');
+    const swExists = fs.existsSync(path.resolve(__dirname, '../sw.js'));
+    let swContent = '';
+    if (swExists) {
+      swContent = fs.readFileSync(path.resolve(__dirname, '../sw.js'), 'utf8');
+    }
+
+    const hasCacheName = swContent.includes('CACHE_NAME');
+    const hasPrecacheList = swContent.includes('PRECACHE_ASSETS') &&
+      swContent.includes('index.html') &&
+      swContent.includes('styles.css') &&
+      swContent.includes('src/app.js');
+    const hasInstallListener = swContent.includes("addEventListener('install'");
+    const hasActivateListener = swContent.includes("addEventListener('activate'");
+    const hasFetchListener = swContent.includes("addEventListener('fetch'");
+
+    const indexHtmlContent = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8');
+    const hasSwRegistration = indexHtmlContent.includes('navigator.serviceWorker.register');
+
+    const isOfflineReady = swExists &&
+      hasCacheName &&
+      hasPrecacheList &&
+      hasInstallListener &&
+      hasActivateListener &&
+      hasFetchListener &&
+      hasSwRegistration;
+
+    assert(isOfflineReady, '100% Offline Airplane Mode Service Worker is configured with cache-first strategy, pre-cached assets, and registered in index.html');
+
+    // TEST 55: Smart Boundary Edge Auto-Scrolling for Note Cards
+    console.log('\n--- 55. Smart Boundary Edge Auto-Scrolling for Note Cards ---');
+    const edgeScrollMathResult = await page.evaluate(() => {
+      const canvas = window.app.canvas;
+      const vp = canvas.viewport;
+      const rect = vp.getBoundingClientRect();
+
+      // 1. In the middle of viewport -> zero velocity
+      const centerVel = canvas.getEdgeScrollVelocity(rect.left + rect.width / 2, rect.top + rect.height / 2, 60);
+
+      // 2. Near right edge (within 60px) -> positive vx
+      const rightVel = canvas.getEdgeScrollVelocity(rect.right - 25, rect.top + rect.height / 2, 60);
+
+      // 3. Near bottom edge (within 60px) -> positive vy
+      const bottomVel = canvas.getEdgeScrollVelocity(rect.left + rect.width / 2, rect.bottom - 25, 60);
+
+      // 4. Near left edge (within 60px) -> negative vx
+      const leftVel = canvas.getEdgeScrollVelocity(rect.left + 25, rect.top + rect.height / 2, 60);
+
+      // 5. Near top edge (within 60px) -> negative vy
+      const topVel = canvas.getEdgeScrollVelocity(rect.left + rect.width / 2, rect.top + 25, 60);
+
+      return (
+        centerVel.vx === 0 && centerVel.vy === 0 &&
+        rightVel.vx > 0 &&
+        bottomVel.vy > 0 &&
+        leftVel.vx < 0 &&
+        topVel.vy < 0
+      );
+    });
+    assert(edgeScrollMathResult, 'Smart edge velocity engine calculates proportional directional scrolling within 60px boundary zone and zeroes at center');
+
+    // Interactive card drag near screen edge triggers live auto-scrolling
+    const interactiveEdgeScrollResult = await page.evaluate(async () => {
+      const box = window.app.noteBoxes[0];
+      const vp = window.app.canvas.viewport;
+      vp.scrollLeft = 0;
+      vp.scrollTop = 0;
+      const initialScroll = vp.scrollLeft;
+
+      const header = box.element.querySelector('.note-header');
+      const rect = vp.getBoundingClientRect();
+
+      // Mouse down on header
+      header.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + 100,
+        clientY: rect.top + 100
+      }));
+
+      // Move mouse to within 30px of right screen edge
+      window.dispatchEvent(new MouseEvent('mousemove', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.right - 30,
+        clientY: rect.top + 100
+      }));
+
+      // Wait 120ms for RAF auto-scroll frames to advance
+      await new Promise(r => setTimeout(r, 120));
+
+      // Mouse up to stop
+      window.dispatchEvent(new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true
+      }));
+
+      const finalScroll = vp.scrollLeft;
+      return finalScroll > initialScroll;
+    });
+    assert(interactiveEdgeScrollResult, 'Dragging a note card near screen boundary smoothly glides the canvas viewport and halts on release');
+
+    // TEST 56: Smart Boundary Edge Auto-Scrolling for Marquee Selection
+    console.log('\n--- 56. Smart Boundary Edge Auto-Scrolling for Marquee Selection ---');
+    const marqueeEdgeScrollResult = await page.evaluate(async () => {
+      const stage = window.app.canvas.stage;
+      const vp = window.app.canvas.viewport;
+      vp.scrollLeft = 0;
+      vp.scrollTop = 0;
+      const initialScroll = vp.scrollLeft;
+      const rect = vp.getBoundingClientRect();
+
+      // Mouse down on empty stage space
+      stage.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + 50,
+        clientY: rect.top + 50,
+        button: 0
+      }));
+
+      // Drag marquee selection towards right screen edge (within 25px)
+      window.dispatchEvent(new MouseEvent('mousemove', {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.right - 25,
+        clientY: rect.top + 50
+      }));
+
+      // Wait 120ms for edge auto-scrolling to advance
+      await new Promise(r => setTimeout(r, 120));
+
+      // Mouse up
+      window.dispatchEvent(new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true
+      }));
+
+      const finalScroll = vp.scrollLeft;
+      const marqueeCleanedUp = document.querySelector('.marquee-selection-box') === null;
+
+      return finalScroll > initialScroll && marqueeCleanedUp;
+    });
+    assert(marqueeEdgeScrollResult, 'Marquee lasso selection smoothly glides the canvas viewport near screen edges and cleans up marquee box on release');
+
+    // TEST 57: Tablet 1-Finger Canvas Background Panning
+    console.log('\n--- 57. Tablet 1-Finger Canvas Background Panning ---');
+    const touchPanResult = await page.evaluate(async () => {
+      const vp = window.app.canvas.viewport;
+      vp.scrollLeft = 100;
+      vp.scrollTop = 100;
+      const initialScrollX = vp.scrollLeft;
+      const initialScrollY = vp.scrollTop;
+      const rect = vp.getBoundingClientRect();
+
+      // Finger 1 down on empty background
+      vp.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 101,
+        pointerType: 'touch',
+        clientX: rect.left + 300,
+        clientY: rect.top + 300
+      }));
+
+      // Finger 1 drag left by 80px (scrolls right)
+      window.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 101,
+        pointerType: 'touch',
+        clientX: rect.left + 220,
+        clientY: rect.top + 220
+      }));
+
+      await new Promise(r => setTimeout(r, 60));
+
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 101,
+        pointerType: 'touch',
+        clientX: rect.left + 220,
+        clientY: rect.top + 220
+      }));
+
+      return vp.scrollLeft > initialScrollX && vp.scrollTop > initialScrollY;
+    });
+    assert(touchPanResult, '1-finger touch drag on empty canvas smoothly pans the viewport');
+
+    // TEST 58: Tablet 2-Finger Pinch-to-Zoom
+    console.log('\n--- 58. Tablet 2-Finger Pinch-to-Zoom ---');
+    const pinchZoomResult = await page.evaluate(async () => {
+      const vp = window.app.canvas.viewport;
+      window.app.canvas.setZoom(1.0);
+      const initialZoom = window.app.canvas.zoomLevel;
+      const rect = vp.getBoundingClientRect();
+
+      // Finger 1 down
+      vp.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 201,
+        pointerType: 'touch',
+        clientX: rect.left + 300,
+        clientY: rect.top + 300
+      }));
+
+      // Finger 2 down (100px apart)
+      vp.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 202,
+        pointerType: 'touch',
+        clientX: rect.left + 400,
+        clientY: rect.top + 300
+      }));
+
+      // Finger 2 spreads out to 550px (pinch outwards to zoom in)
+      window.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 202,
+        pointerType: 'touch',
+        clientX: rect.left + 550,
+        clientY: rect.top + 300
+      }));
+
+      await new Promise(r => setTimeout(r, 60));
+
+      const finalZoom = window.app.canvas.zoomLevel;
+
+      // Fingers lifted
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 201, pointerType: 'touch' }));
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 202, pointerType: 'touch' }));
+
+      // Reset zoom back to 1.0
+      window.app.canvas.setZoom(1.0);
+
+      return finalZoom > initialZoom;
+    });
+    assert(pinchZoomResult, '2-finger pinch spread gesture dynamically zooms in the canvas');
+
+    // TEST 59: Tablet Touch Dragging on Note Box Header
+    console.log('\n--- 59. Tablet Touch Dragging on Note Box Header ---');
+    const touchDragCardResult = await page.evaluate(async () => {
+      const box = window.app.noteBoxes[0];
+      const initialX = box.x;
+      const initialY = box.y;
+      const header = box.element.querySelector('.note-header');
+      const rect = header.getBoundingClientRect();
+
+      // Touch down on header
+      header.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 301,
+        pointerType: 'touch',
+        clientX: rect.left + 20,
+        clientY: rect.top + 10
+      }));
+
+      // Drag touch by 60px right and 40px down
+      window.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 301,
+        pointerType: 'touch',
+        clientX: rect.left + 80,
+        clientY: rect.top + 50
+      }));
+
+      await new Promise(r => setTimeout(r, 50));
+
+      // Touch up
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 301,
+        pointerType: 'touch',
+        clientX: rect.left + 80,
+        clientY: rect.top + 50
+      }));
+
+      return box.x > initialX && box.y > initialY;
+    });
+    assert(touchDragCardResult, 'Finger touch drag on note header smoothly moves note card across canvas');
+
+    // TEST 60: Tablet Touch 8-Point Perimeter Resizing
+    console.log('\n--- 60. Tablet Touch 8-Point Perimeter Resizing ---');
+    const touchResizeResult = await page.evaluate(async () => {
+      const box = window.app.noteBoxes[0];
+      const initialW = box.element.offsetWidth;
+      const initialH = box.element.offsetHeight;
+      const seHandle = box.element.querySelector('.resize-handle.se');
+      const rect = seHandle.getBoundingClientRect();
+
+      // Touch down on Southeast corner handle
+      seHandle.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 401,
+        pointerType: 'touch',
+        clientX: rect.left + 4,
+        clientY: rect.top + 4
+      }));
+
+      // Drag touch down and right by 50px
+      window.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 401,
+        pointerType: 'touch',
+        clientX: rect.left + 54,
+        clientY: rect.top + 54
+      }));
+
+      await new Promise(r => setTimeout(r, 50));
+
+      // Touch up
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 401,
+        pointerType: 'touch'
+      }));
+
+      const finalW = box.element.offsetWidth;
+      const finalH = box.element.offsetHeight;
+
+      return finalW > initialW && finalH > initialH;
+    });
+    assert(touchResizeResult, 'Finger touch drag on 8-point corner handle smoothly resizes note box dimensions');
 
 
 

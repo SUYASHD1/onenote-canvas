@@ -41,8 +41,9 @@ class OneNoteApp {
       this.deselectAll();
     };
 
-    // 3. Connect Ribbon Toolbar
+    // 3. Connect Ribbon Toolbar & Theme
     this.bindRibbonControls();
+    this.initTheme();
 
     // 4. Always seed latest fresh starter notes on launch
     try {
@@ -305,6 +306,49 @@ class OneNoteApp {
     if (btnZoomIn) btnZoomIn.onclick = () => this.canvas.adjustZoom(0.1);
     if (btnZoomOut) btnZoomOut.onclick = () => this.canvas.adjustZoom(-0.1);
     if (btnToggleGrid) btnToggleGrid.onclick = () => this.canvas.toggleGrid();
+  }
+
+  /**
+   * Executive Dark Mode & Light Theme Manager
+   */
+  initTheme() {
+    let savedTheme = 'light';
+    try {
+      savedTheme = localStorage.getItem('onenote_theme') || 'light';
+    } catch (_) {}
+    this.setTheme(savedTheme);
+
+    const btnToggleTheme = document.getElementById('btn-toggle-theme');
+    if (btnToggleTheme) {
+      btnToggleTheme.onclick = () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        this.setTheme(newTheme);
+      };
+    }
+  }
+
+  setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('onenote_theme', theme);
+    } catch (_) {}
+
+    const iconSpan = document.getElementById('theme-toggle-icon');
+    const toggleBtn = document.getElementById('btn-toggle-theme');
+    if (iconSpan) {
+      iconSpan.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+    if (toggleBtn) {
+      toggleBtn.title = theme === 'dark' 
+        ? 'Switch to Daylight Light Mode (☀️)' 
+        : 'Switch to Executive Dark Mode (🌙)';
+    }
+
+    // Adapt ink engine pen swatches and smart inverted vector strokes
+    if (this.inkEngine && typeof this.inkEngine.onThemeChanged === 'function') {
+      this.inkEngine.onThemeChanged(theme);
+    }
   }
 
   /**

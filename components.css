@@ -720,3 +720,118 @@
   opacity: 0.6;
 }
 
+/* ==========================================================================
+   Executive Dark Mode Overrides for Components
+   ========================================================================== */
+
+/* Dark Mode: Tables */
+[data-theme="dark"] .canvas-table {
+  background: #282828;
+  color: #ededed;
+}
+
+[data-theme="dark"] .canvas-table th,
+[data-theme="dark"] .canvas-table.layout-classic-grid th,
+[data-theme="dark"] .canvas-table.layout-zebra-banded th {
+  background: #383838 !important;
+  color: #ffffff !important;
+  border-color: #4a4a4a !important;
+}
+
+[data-theme="dark"] .canvas-table td,
+[data-theme="dark"] .canvas-table.layout-classic-grid td,
+[data-theme="dark"] .canvas-table.layout-zebra-banded td {
+  border-color: #444444 !important;
+  color: #ededed;
+}
+
+[data-theme="dark"] .canvas-table.layout-zebra-banded tr:nth-child(even) td {
+  background-color: #303030 !important;
+}
+
+[data-theme="dark"] .canvas-table.layout-classic-grid,
+[data-theme="dark"] .canvas-table.layout-zebra-banded {
+  border-color: #4a4a4a;
+}
+
+[data-theme="dark"] .canvas-table.layout-modern-accent th {
+  background: var(--primary-purple, #7719aa) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .canvas-table.layout-modern-accent td {
+  border-bottom: 1px solid #3d3d3d !important;
+}
+
+[data-theme="dark"] .canvas-table.layout-compact-matrix {
+  border-color: #555555;
+}
+
+[data-theme="dark"] .canvas-table.layout-compact-matrix th {
+  background: #333333 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .canvas-table.layout-compact-matrix td {
+  border-color: #555555 !important;
+}
+
+/* Dark Mode: Math & Equations */
+[data-theme="dark"] .math-card {
+  background: #2b2b2b !important;
+  border-color: #444444 !important;
+  color: #ededed !important;
+}
+
+[data-theme="dark"] .math-display {
+  color: #ededed !important;
+}
+
+[data-theme="dark"] .inline-math {
+  background: #363636 !important;
+  border-color: #4a4a4a !important;
+  color: #ededed !important;
+}
+
+[data-theme="dark"] .inline-math:hover {
+  background: #424242 !important;
+  border-color: #9b4de0 !important;
+}
+
+[data-theme="dark"] .rendered-math-element,
+[data-theme="dark"] .katex,
+[data-theme="dark"] .inline-math .katex,
+[data-theme="dark"] .math-card .katex {
+  color: #ededed !important;
+}
+
+[data-theme="dark"] .math-latex-input {
+  background: #252526;
+  color: #ededed;
+  border-color: #9b4de0;
+}
+
+/* Dark Mode: Headings */
+[data-theme="dark"] .note-heading.h1 {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .note-heading.h2 {
+  color: #f5f5f5 !important;
+}
+
+[data-theme="dark"] .note-heading.h3,
+[data-theme="dark"] .note-heading.h4,
+[data-theme="dark"] .note-heading.h5,
+[data-theme="dark"] .note-heading.h6 {
+  color: #ededed !important;
+}
+
+[data-theme="dark"] .canvas-block h1,
+[data-theme="dark"] .canvas-block h2,
+[data-theme="dark"] .canvas-block h3,
+[data-theme="dark"] .canvas-block h4 {
+  color: #ededed !important;
+}
+
+

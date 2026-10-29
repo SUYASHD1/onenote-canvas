@@ -310,6 +310,8 @@ class InkEngine {
         shape: null
       };
 
+      // Draw initial contact dot instantly
+      this.drawContactDot(this.currentStroke);
       this.startShapeHoldTimer();
     });
 
@@ -339,7 +341,8 @@ class InkEngine {
       }
 
       this.currentStroke.points.push({ x: pos.x, y: pos.y, p: e.pressure || 0.5 });
-      this.renderActiveStroke();
+      // Buttery smooth incremental segment rendering (0ms lag, no full-canvas clears)
+      this.drawLatestSegment(this.currentStroke);
     });
 
     const stopDrawing = (e) => {
@@ -348,9 +351,11 @@ class InkEngine {
       this.clearShapeHoldTimer();
 
       if (this.currentStroke && this.currentStroke.points.length > 0) {
+        if (this.currentStroke.points.length > 1 && !this.currentStroke.shape) {
+          this.drawFinalSegment(this.currentStroke);
+        }
         this.strokes.push(this.currentStroke);
         this.currentStroke = null;
-        this.renderAllStrokes();
         if (this.app.history) this.app.history.pushState('ink_stroke');
       }
     };
@@ -472,6 +477,61 @@ class InkEngine {
 
   // --- Rendering Vectors & Highlighters ---
 
+  isDarkMode() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+  }
+
+  resolveDisplayColor(color, tool) {
+    if (!color) return color;
+    if (!this.isDarkMode()) {
+      return color;
+    }
+
+    if (tool === 'highlighter') {
+      const c = color.toLowerCase();
+      // Standard daylight yellow highlighter becomes midnight warm amber glow
+      if (c.includes('255, 235, 59') || c.includes('#ffeb3b') || c.includes('yellow')) {
+        return 'rgba(255, 225, 90, 0.65)';
+      }
+      return color;
+    }
+
+    // Pen: automatically soften black/dark ink to cream white (#f5f5f5) on dark paper
+    const clean = color.trim().toLowerCase();
+    if (
+      clean === '#111111' ||
+      clean === '#111' ||
+      clean === '#000000' ||
+      clean === '#000' ||
+      clean === '#1a1a1a' ||
+      clean === '#222222' ||
+      clean === '#242424' ||
+      clean === 'rgb(17, 17, 17)' ||
+      clean === 'rgb(0, 0, 0)' ||
+      clean === 'rgb(36, 36, 36)' ||
+      clean === 'black'
+    ) {
+      return '#f5f5f5';
+    }
+
+    return color;
+  }
+
+  onThemeChanged(theme) {
+    // Update visual swatch on slot 0
+    const slot0Tip = document.querySelector('#pen-slot-0 .pen-slot-tip');
+    const slot0Btn = document.getElementById('pen-slot-0');
+    if (slot0Tip) {
+      slot0Tip.style.backgroundColor = theme === 'dark' ? '#f5f5f5' : '#111111';
+    }
+    if (slot0Btn) {
+      slot0Btn.title = theme === 'dark' ? 'Pen 1 (Cream White)' : 'Pen 1 (Black)';
+    }
+
+    // Refresh inking canvas with smart theme colors
+    this.renderAllStrokes();
+  }
+
   renderAllStrokes() {
     this.inkCtx.clearRect(0, 0, this.inkCanvas.width, this.inkCanvas.height);
     this.highlighterCtx.clearRect(0, 0, this.highlighterCanvas.width, this.highlighterCanvas.height);
@@ -484,18 +544,100 @@ class InkEngine {
     this.drawStroke(this.currentStroke);
   }
 
-  drawStroke(stroke) {
+  drawContactDot(stroke) {
+    const isHighlighter = stroke.tool === 'highlighter';
+    const ctx = isHighlighter ? this.highlighterCtx : this.inkCtx;
+    const pt = stroke.points[0];
+    if (!pt) return;
+
+    ctx.save();
+    ctx.fillStyle = this.resolveDisplayColor(stroke.color, stroke.tool);
+    if (isHighlighter) {
+      ctx.globalCompositeOperation = this.isDarkMode() ? 'screen' : 'multiply';
+    }
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, stroke.width / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawLatestSegment(stroke) {
+    const pts = stroke.points;
+    const len = pts.length;
+    if (len < 2) return;
+
     const isHighlighter = stroke.tool === 'highlighter';
     const ctx = isHighlighter ? this.highlighterCtx : this.inkCtx;
 
     ctx.save();
-    ctx.strokeStyle = stroke.color;
+    ctx.strokeStyle = this.resolveDisplayColor(stroke.color, stroke.tool);
     ctx.lineWidth = stroke.width;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
     if (isHighlighter) {
-      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalCompositeOperation = this.isDarkMode() ? 'screen' : 'multiply';
+    }
+
+    ctx.beginPath();
+    if (len === 2) {
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(midX, midY);
+    } else {
+      const prevMidX = (pts[len - 3].x + pts[len - 2].x) / 2;
+      const prevMidY = (pts[len - 3].y + pts[len - 2].y) / 2;
+      const curMidX = (pts[len - 2].x + pts[len - 1].x) / 2;
+      const curMidY = (pts[len - 2].y + pts[len - 1].y) / 2;
+
+      ctx.moveTo(prevMidX, prevMidY);
+      ctx.quadraticCurveTo(pts[len - 2].x, pts[len - 2].y, curMidX, curMidY);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawFinalSegment(stroke) {
+    const pts = stroke.points;
+    const len = pts.length;
+    if (len < 2) return;
+
+    const isHighlighter = stroke.tool === 'highlighter';
+    const ctx = isHighlighter ? this.highlighterCtx : this.inkCtx;
+
+    ctx.save();
+    ctx.strokeStyle = this.resolveDisplayColor(stroke.color, stroke.tool);
+    ctx.lineWidth = stroke.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (isHighlighter) {
+      ctx.globalCompositeOperation = this.isDarkMode() ? 'screen' : 'multiply';
+    }
+
+    ctx.beginPath();
+    const finalMidX = (pts[len - 2].x + pts[len - 1].x) / 2;
+    const finalMidY = (pts[len - 2].y + pts[len - 1].y) / 2;
+    ctx.moveTo(finalMidX, finalMidY);
+    ctx.lineTo(pts[len - 1].x, pts[len - 1].y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawStroke(stroke) {
+    const isHighlighter = stroke.tool === 'highlighter';
+    const ctx = isHighlighter ? this.highlighterCtx : this.inkCtx;
+    const displayColor = this.resolveDisplayColor(stroke.color, stroke.tool);
+
+    ctx.save();
+    ctx.strokeStyle = displayColor;
+    ctx.lineWidth = stroke.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (isHighlighter) {
+      ctx.globalCompositeOperation = this.isDarkMode() ? 'screen' : 'multiply';
     }
 
     if (stroke.shape) {
@@ -518,7 +660,7 @@ class InkEngine {
       if (pts.length === 1) {
         ctx.beginPath();
         ctx.arc(pts[0].x, pts[0].y, stroke.width / 2, 0, Math.PI * 2);
-        ctx.fillStyle = stroke.color;
+        ctx.fillStyle = displayColor;
         ctx.fill();
       }
       ctx.restore();

@@ -93,11 +93,13 @@ class NoteBox {
     this.contentArea = content;
 
     // Selection behavior
-    header.addEventListener('mousedown', (e) => {
+    const onHeaderSelect = (e) => {
       if (e.target !== closeBtn) {
         this.app.selectNoteBox(this);
       }
-    });
+    };
+    header.addEventListener('pointerdown', onHeaderSelect);
+    header.addEventListener('mousedown', onHeaderSelect);
 
     content.addEventListener('focus', () => {
       this.app.selectNoteBox(this, false); // select without border outline to type freely
@@ -118,9 +120,8 @@ class NoteBox {
       }
     });
 
+    // Fast 0ms typing listener (DOM image & table scans are decoupled and executed strictly on paste/drop)
     content.addEventListener('input', () => {
-      this.upgradeStrayImages();
-      this.upgradeStrayTables();
       if (this.app.history) {
         this.app.history.debouncePush('edit_text');
       }
@@ -345,14 +346,32 @@ class NoteBox {
     let isDragging = false;
     let startClientX = 0;
     let startClientY = 0;
-    let startBoxX = 0;
-    let startBoxY = 0;
+    let startScrollLeft = 0;
+    let startScrollTop = 0;
+    let lastClientX = 0;
+    let lastClientY = 0;
+    let curDx = 0;
+    let curDy = 0;
+    let rafId = null;
+    let edgeScrollRafId = null;
 
-    this.header.addEventListener('mousedown', (e) => {
+    const onStart = (e) => {
       if (e.target.classList.contains('note-close-btn')) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (isDragging) return;
       isDragging = true;
       startClientX = e.clientX;
       startClientY = e.clientY;
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+      startScrollLeft = this.app.canvas.viewport ? this.app.canvas.viewport.scrollLeft : 0;
+      startScrollTop = this.app.canvas.viewport ? this.app.canvas.viewport.scrollTop : 0;
+      curDx = 0;
+      curDy = 0;
+
+      if (e.pointerId !== undefined && this.header.setPointerCapture) {
+        try { this.header.setPointerCapture(e.pointerId); } catch (_) {}
+      }
 
       const isMulti = this.element.classList.contains('multi-selected');
       const boxesToMove = isMulti
@@ -365,39 +384,134 @@ class NoteBox {
         startY: b.y
       }));
 
-      e.preventDefault();
+      // Activate hardware acceleration compositor layer
+      boxesToMove.forEach(b => {
+        b.element.classList.add('dragging-active');
+      });
 
-      const onMouseMove = (ev) => {
+      if (e.cancelable) e.preventDefault();
+
+      const applyGpuTransform = () => {
         if (!isDragging) return;
-        const zoom = this.app.canvas.zoomLevel;
-        const dx = (ev.clientX - startClientX) / zoom;
-        const dy = (ev.clientY - startClientY) / zoom;
-
         startPositions.forEach(item => {
-          item.box.x = Math.max(10, Math.round(item.startX + dx));
-          item.box.y = Math.max(10, Math.round(item.startY + dy));
-          item.box.element.style.left = `${item.box.x}px`;
-          item.box.element.style.top = `${item.box.y}px`;
+          const moveX = item.box.x - item.startX;
+          const moveY = item.box.y - item.startY;
+          item.box.element.style.transform = `translate3d(${moveX}px, ${moveY}px, 0px)`;
         });
-
-        // Check if canvas stage needs to grow down or right
-        this.app.canvas.ensureBounds(this.app.noteBoxes);
+        rafId = null;
       };
 
-      const onMouseUp = () => {
+      const updateCardPositions = () => {
+        const zoom = this.app.canvas.zoomLevel || 1.0;
+        const curScrollLeft = this.app.canvas.viewport ? this.app.canvas.viewport.scrollLeft : 0;
+        const curScrollTop = this.app.canvas.viewport ? this.app.canvas.viewport.scrollTop : 0;
+        const scrollDeltaX = curScrollLeft - startScrollLeft;
+        const scrollDeltaY = curScrollTop - startScrollTop;
+
+        curDx = (lastClientX - startClientX + scrollDeltaX) / zoom;
+        curDy = (lastClientY - startClientY + scrollDeltaY) / zoom;
+
+        startPositions.forEach(item => {
+          item.box.x = Math.max(10, Math.round(item.startX + curDx));
+          item.box.y = Math.max(10, Math.round(item.startY + curDy));
+        });
+
+        // Run smooth visual translation on GPU display frame
+        if (!rafId) {
+          rafId = requestAnimationFrame(applyGpuTransform);
+        } else {
+          applyGpuTransform();
+        }
+      };
+
+      const edgeScrollLoop = () => {
+        if (!isDragging) return;
+        const boxRect = this.element.getBoundingClientRect();
+        const vel = this.app.canvas.getEdgeScrollVelocity(lastClientX, lastClientY, 80, boxRect);
+        if (vel.vx !== 0 || vel.vy !== 0) {
+          const vp = this.app.canvas.viewport;
+          if (vp) {
+            // Expand stage if scrolling past current boundaries
+            if (vel.vx > 0 && vp.scrollLeft + vp.clientWidth + 100 > this.app.canvas.currentWidth) {
+              this.app.canvas.currentWidth += 300;
+              this.app.canvas.applyDimensions();
+            }
+            if (vel.vy > 0 && vp.scrollTop + vp.clientHeight + 100 > this.app.canvas.currentHeight) {
+              this.app.canvas.currentHeight += 300;
+              this.app.canvas.applyDimensions();
+            }
+
+            vp.scrollLeft += vel.vx;
+            vp.scrollTop += vel.vy;
+            this.app.canvas.updateGhostScrollbars();
+          }
+
+          updateCardPositions();
+          edgeScrollRafId = requestAnimationFrame(edgeScrollLoop);
+        } else {
+          edgeScrollRafId = null;
+        }
+      };
+
+      const onMove = (ev) => {
+        if (!isDragging) return;
+        lastClientX = ev.clientX;
+        lastClientY = ev.clientY;
+        updateCardPositions();
+
+        const boxRect = this.element.getBoundingClientRect();
+        const vel = this.app.canvas.getEdgeScrollVelocity(lastClientX, lastClientY, 80, boxRect);
+        if ((vel.vx !== 0 || vel.vy !== 0) && !edgeScrollRafId) {
+          edgeScrollRafId = requestAnimationFrame(edgeScrollLoop);
+        }
+      };
+
+      const onEnd = (ev) => {
+        if (ev && ev.pointerId !== undefined && this.header.releasePointerCapture) {
+          try { this.header.releasePointerCapture(ev.pointerId); } catch (_) {}
+        }
         if (isDragging) {
           isDragging = false;
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+          if (edgeScrollRafId) {
+            cancelAnimationFrame(edgeScrollRafId);
+            edgeScrollRafId = null;
+          }
+
+          // Commit final positions to left/top and release GPU transform
+          startPositions.forEach(item => {
+            item.box.element.style.transform = '';
+            item.box.element.style.left = `${item.box.x}px`;
+            item.box.element.style.top = `${item.box.y}px`;
+            item.box.element.classList.remove('dragging-active');
+          });
+
+          // Perform bounds expansion once at release point
+          this.app.canvas.ensureBounds(this.app.noteBoxes);
+
           if (this.app.history) {
             this.app.history.pushState('move_box');
           }
         }
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onEnd);
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onEnd);
+        window.removeEventListener('pointercancel', onEnd);
       };
 
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    });
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onEnd);
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onEnd);
+      window.addEventListener('pointercancel', onEnd);
+    };
+
+    this.header.addEventListener('pointerdown', onStart);
+    this.header.addEventListener('mousedown', onStart);
   }
 
   /**
@@ -406,11 +520,20 @@ class NoteBox {
   bindPerimeterResize() {
     const handles = this.element.querySelectorAll('.resize-handle');
     handles.forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const pos = handle.dataset.position;
+      let isResizing = false;
 
+      const onResizeStart = (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (isResizing) return;
+        isResizing = true;
+        e.stopPropagation();
+        if (e.cancelable) e.preventDefault();
+
+        if (e.pointerId !== undefined && handle.setPointerCapture) {
+          try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+
+        const pos = handle.dataset.position;
         const startClientX = e.clientX;
         const startClientY = e.clientY;
         const startX = this.x;
@@ -418,8 +541,9 @@ class NoteBox {
         const startW = this.element.offsetWidth;
         const startH = this.element.offsetHeight;
 
-        const onMouseMove = (ev) => {
-          const zoom = this.app.canvas.zoomLevel;
+        const onResizeMove = (ev) => {
+          if (!isResizing) return;
+          const zoom = this.app.canvas.zoomLevel || 1.0;
           const dx = (ev.clientX - startClientX) / zoom;
           const dy = (ev.clientY - startClientY) / zoom;
 
@@ -465,17 +589,32 @@ class NoteBox {
           this.app.canvas.ensureBounds(this.app.noteBoxes);
         };
 
-        const onMouseUp = () => {
-          if (this.app.history) {
-            this.app.history.pushState('resize_box');
+        const onResizeEnd = (ev) => {
+          if (ev && ev.pointerId !== undefined && handle.releasePointerCapture) {
+            try { handle.releasePointerCapture(ev.pointerId); } catch (_) {}
           }
-          window.removeEventListener('mousemove', onMouseMove);
-          window.removeEventListener('mouseup', onMouseUp);
+          if (isResizing) {
+            isResizing = false;
+            if (this.app.history) {
+              this.app.history.pushState('resize_box');
+            }
+          }
+          window.removeEventListener('mousemove', onResizeMove);
+          window.removeEventListener('mouseup', onResizeEnd);
+          window.removeEventListener('pointermove', onResizeMove);
+          window.removeEventListener('pointerup', onResizeEnd);
+          window.removeEventListener('pointercancel', onResizeEnd);
         };
 
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-      });
+        window.addEventListener('mousemove', onResizeMove);
+        window.addEventListener('mouseup', onResizeEnd);
+        window.addEventListener('pointermove', onResizeMove);
+        window.addEventListener('pointerup', onResizeEnd);
+        window.addEventListener('pointercancel', onResizeEnd);
+      };
+
+      handle.addEventListener('pointerdown', onResizeStart);
+      handle.addEventListener('mousedown', onResizeStart);
     });
   }
 

@@ -823,19 +823,13 @@ body {
   outline: none;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  touch-action: none;
 }
 
 .canvas-viewport::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
-}
-
-.canvas-viewport.show-grid {
-  background-image: 
-    linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-line-color) 1px, transparent 1px);
-  background-size: 24px 24px;
 }
 
 /* Translucent Ghost Spatial Scrollbars */
@@ -898,7 +892,6 @@ body {
   min-width: 3200px;
   min-height: 2400px;
   transform-origin: 0 0;
-  transition: width 0.1s ease, height 0.1s ease;
   box-shadow: none;
 }
 
@@ -934,6 +927,14 @@ body {
   user-select: text;
   display: flex;
   flex-direction: column;
+  contain: layout;
+}
+
+.note-box.dragging-active {
+  will-change: transform;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16) !important;
+  z-index: 100 !important;
+  cursor: grabbing !important;
 }
 
 .note-box:hover {
@@ -963,6 +964,8 @@ body {
   opacity: 0;
   transition: opacity 0.1s ease;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
 .note-box:hover .note-header,
@@ -1004,6 +1007,7 @@ body {
   color: var(--text-main);
   position: relative;
   word-break: break-word;
+  touch-action: pan-y;
 }
 
 /* ==========================================================================
@@ -1052,6 +1056,8 @@ body {
   opacity: 0;
   transition: opacity 0.1s ease, color 0.1s ease;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
   font-size: 11px;
 }
 
@@ -1114,6 +1120,7 @@ body {
   z-index: 15;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
 }
 
 .note-box.selected .resize-handle,
@@ -1395,6 +1402,463 @@ body.ink-mode-active #active-draw-canvas {
 .shape-snap-pill.visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* ==========================================================================
+   Executive Dark Mode Theme Palette (Warm Charcoal #282828 & OneNote Purple)
+   ========================================================================== */
+
+[data-theme="dark"] {
+  --primary-purple: #9b4de0;
+  --primary-purple-hover: #b470f5;
+  --primary-purple-light: rgba(155, 77, 224, 0.22);
+  --onenote-header-gray: #272727;
+  --onenote-border-gray: #3d3d3d;
+  --onenote-active-border: #9b4de0;
+  --bg-page: #282828;
+  --bg-canvas-grid: #282828;
+  --grid-line-color: rgba(255, 255, 255, 0.07);
+  --text-main: #ededed;
+  --text-muted: #a0a0a0;
+  --guideline-blue: #3b99fc;
+  --card-bg: #323232;
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --ghost-scrollbar-bg: rgba(255, 255, 255, 0.08);
+  --ghost-scrollbar-hover: rgba(255, 255, 255, 0.16);
+  --ghost-scrollbar-thumb: #555555;
+  --ghost-scrollbar-thumb-hover: var(--primary-purple);
+  --marquee-border: var(--guideline-blue);
+  --marquee-bg: rgba(59, 153, 252, 0.12);
+}
+
+[data-theme="dark"] body {
+  background-color: #1e1e1e;
+  color: #ededed;
+}
+
+/* Dark Mode: Top Header & Ribbon */
+[data-theme="dark"] .app-header {
+  background: #1e1e1e;
+  border-bottom-color: #333333;
+}
+
+[data-theme="dark"] .header-brand {
+  background: #181818;
+  border-bottom-color: #2a2a2a;
+}
+
+[data-theme="dark"] .ribbon-bar {
+  background: #1e1e1e;
+}
+
+[data-theme="dark"] .ribbon-divider {
+  background: #333333;
+}
+
+[data-theme="dark"] .ribbon-tab-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .ribbon-tab-btn.active {
+  color: #bb86fc;
+  border-bottom-color: #bb86fc;
+  background: rgba(187, 134, 252, 0.12);
+}
+
+[data-theme="dark"] .ribbon-btn {
+  color: #ededed;
+}
+
+[data-theme="dark"] .ribbon-btn:hover {
+  background: #2d2d2d;
+  border-color: #3d3d3d;
+}
+
+[data-theme="dark"] .ribbon-btn:active {
+  background: #383838;
+}
+
+[data-theme="dark"] .ribbon-btn.active {
+  background: rgba(155, 77, 224, 0.25);
+  border-color: #9b4de0;
+  color: #bb86fc;
+}
+
+[data-theme="dark"] .ribbon-select {
+  background: #252526;
+  color: #ededed;
+  border-color: #3d3d3d;
+}
+
+[data-theme="dark"] .pen-slots-container {
+  background: #252526;
+  border-color: #383838;
+}
+
+[data-theme="dark"] .color-palette-flyout {
+  background: #252526;
+  border-color: #383838;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .split-color-container:hover {
+  background: #2d2d2d;
+  border-color: #383838;
+}
+
+[data-theme="dark"] .split-chevron-btn {
+  border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .split-chevron-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Dark Mode: Sidebar */
+[data-theme="dark"] .app-sidebar {
+  background: #202020;
+  border-right-color: #333333;
+}
+
+[data-theme="dark"] .sidebar-top-bar {
+  background: #1c1c1c;
+  border-bottom-color: #333333;
+}
+
+[data-theme="dark"] .notebook-picker-btn:hover {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .sidebar-col.sections-col {
+  background: #222222;
+  border-right-color: #333333;
+}
+
+[data-theme="dark"] .sidebar-col.pages-col {
+  background: #1c1c1c;
+}
+
+[data-theme="dark"] .sidebar-col-footer {
+  border-top-color: #333333;
+}
+
+[data-theme="dark"] .section-item {
+  color: #ededed;
+}
+
+[data-theme="dark"] .section-item:hover {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .section-item.active {
+  background: #333333;
+  color: #bb86fc;
+}
+
+[data-theme="dark"] .page-item:hover {
+  background: #282828;
+}
+
+[data-theme="dark"] .page-item.active {
+  background: rgba(155, 77, 224, 0.22);
+  border-left-color: #9b4de0;
+}
+
+[data-theme="dark"] .page-item-title {
+  color: #ededed;
+}
+
+[data-theme="dark"] .page-item-preview {
+  color: #9e9e9e;
+}
+
+[data-theme="dark"] .sidebar-rename-input {
+  background: #252526;
+  color: #ededed;
+  border-color: #9b4de0;
+}
+
+[data-theme="dark"] .notebooks-drawer {
+  background: #252526;
+  border-bottom-color: #3d3d3d;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .drawer-header {
+  border-bottom-color: #383838;
+  color: #aaaaaa;
+}
+
+[data-theme="dark"] .notebook-item {
+  color: #ededed;
+}
+
+[data-theme="dark"] .notebook-item:hover {
+  background: #2f2f30;
+}
+
+[data-theme="dark"] .notebook-item.active {
+  background: rgba(155, 77, 224, 0.25);
+  color: #bb86fc;
+  border-left-color: #9b4de0;
+}
+
+/* Dark Mode: Canvas & Note Cards */
+[data-theme="dark"] .canvas-viewport {
+  background-color: #282828;
+}
+
+[data-theme="dark"] .canvas-stage {
+  background-color: #282828;
+}
+
+[data-theme="dark"] .note-box {
+  background: #323232;
+  border-color: #3d3d3d;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  color: #ededed;
+}
+
+[data-theme="dark"] .note-box:hover {
+  border-color: #555555;
+}
+
+[data-theme="dark"] .note-box.selected {
+  border-color: #9b4de0;
+  box-shadow: 0 0 0 1px #9b4de0;
+}
+
+[data-theme="dark"] .note-header {
+  background: #272727;
+  border-bottom: 1px solid #383838;
+}
+
+[data-theme="dark"] .note-move-handle {
+  color: #aaaaaa;
+}
+
+[data-theme="dark"] .note-close-btn {
+  color: #aaaaaa;
+}
+
+[data-theme="dark"] .note-close-btn:hover {
+  color: #ff6b6b;
+  background: #3d3d3d;
+}
+
+[data-theme="dark"] .text-block-wrapper {
+  color: #ededed;
+}
+
+[data-theme="dark"] .text-block-wrapper:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Dark Mode: Tables */
+[data-theme="dark"] .canvas-table {
+  background: #2c2c2c;
+  color: #ededed;
+}
+
+[data-theme="dark"] .canvas-table td,
+[data-theme="dark"] .canvas-table th {
+  border-color: #444444;
+  color: #ededed;
+}
+
+[data-theme="dark"] .canvas-table th {
+  background: #383838;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .table-toolbar {
+  background: #252526;
+  border-color: #3d3d3d;
+}
+
+[data-theme="dark"] .table-tool-btn {
+  background: #2f2f30;
+  border-color: #444444;
+  color: #ededed;
+}
+
+[data-theme="dark"] .table-tool-btn:hover {
+  background: #3d3d3d;
+}
+
+[data-theme="dark"] .table-layout-select {
+  background: #2f2f30;
+  border-color: #444444;
+  color: #ededed;
+}
+
+[data-theme="dark"] .canvas-table.layout-zebra tr:nth-child(even) {
+  background: #353535;
+}
+
+[data-theme="dark"] .canvas-table.layout-classic-grid td,
+[data-theme="dark"] .canvas-table.layout-classic-grid th {
+  border-color: #444444;
+}
+
+/* Dark Mode: Math, Images, Callouts & Modals */
+[data-theme="dark"] .math-card {
+  background: #2b2b2b;
+  border-color: #444444;
+  color: #ededed;
+}
+
+[data-theme="dark"] .math-display {
+  color: #ededed;
+}
+
+[data-theme="dark"] .inline-math {
+  background: #363636;
+  border-color: #4a4a4a;
+  color: #ededed;
+}
+
+[data-theme="dark"] .inline-math:hover {
+  background: #404040;
+  border-color: #9b4de0;
+}
+
+[data-theme="dark"] .rendered-math-element,
+[data-theme="dark"] .katex {
+  color: #ededed !important;
+}
+
+[data-theme="dark"] .math-tools-bar,
+[data-theme="dark"] .math-block-tools {
+  background: #252526;
+  border-color: #383838;
+}
+
+[data-theme="dark"] .math-tool-btn {
+  background: #2f2f30;
+  border-color: #444444;
+  color: #ededed;
+}
+
+[data-theme="dark"] .math-tool-btn:hover {
+  background: #3d3d3d;
+}
+
+[data-theme="dark"] .callout-card {
+  background: rgba(155, 77, 224, 0.12);
+  color: #ededed;
+}
+
+[data-theme="dark"] .storage-modal-card {
+  background: #252526;
+  border-color: #383838;
+  color: #ededed;
+}
+
+[data-theme="dark"] .storage-modal-header {
+  background: #1e1e1e;
+  border-bottom-color: #333333;
+  color: #ededed;
+}
+
+[data-theme="dark"] .stat-card {
+  background: #1e1e1e;
+  border-color: #333333;
+}
+
+[data-theme="dark"] .storage-section-block {
+  background: #1e1e1e;
+  border-color: #333333;
+}
+
+[data-theme="dark"] .crop-dialog {
+  background: #252526;
+  border-color: #383838;
+  color: #ededed;
+}
+
+[data-theme="dark"] .crop-dialog-header {
+  border-bottom-color: #333333;
+  color: #ededed;
+}
+
+[data-theme="dark"] .crop-dialog-footer {
+  border-top-color: #333333;
+  background: #1e1e1e;
+}
+
+[data-theme="dark"] .image-caption {
+  color: #a0a0a0;
+}
+
+[data-theme="dark"] .ink-surface-layer.under-text {
+  mix-blend-mode: screen;
+}
+
+/* Dark Mode: Text Highlighter Midnight Glow Inversion (Option A) */
+[data-theme="dark"] .note-box mark {
+  background-color: rgba(255, 214, 0, 0.28) !important;
+  color: #ededed !important;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Yellow / Amber Glow */
+[data-theme="dark"] .note-box [style*="#fff59d"],
+[data-theme="dark"] .note-box [style*="255, 245, 157"],
+[data-theme="dark"] .note-box [style*="255, 255, 0"],
+[data-theme="dark"] .note-box [style*="yellow"] {
+  background-color: rgba(255, 214, 0, 0.28) !important;
+  color: #ededed !important;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Pink / Ruby Rose Glow */
+[data-theme="dark"] .note-box [style*="#f8bbd0"],
+[data-theme="dark"] .note-box [style*="248, 187, 208"],
+[data-theme="dark"] .note-box [style*="pink"] {
+  background-color: rgba(244, 114, 182, 0.32) !important;
+  color: #ededed !important;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Green / Emerald Glow */
+[data-theme="dark"] .note-box [style*="#c8e6c9"],
+[data-theme="dark"] .note-box [style*="200, 230, 201"] {
+  background-color: rgba(52, 211, 153, 0.28) !important;
+  color: #ededed !important;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Sky Cyan / Sapphire Glow */
+[data-theme="dark"] .note-box [style*="#b3e5fc"],
+[data-theme="dark"] .note-box [style*="179, 229, 252"] {
+  background-color: rgba(56, 189, 248, 0.28) !important;
+  color: #ededed !important;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Lavender Purple / Amethyst Glow */
+[data-theme="dark"] .note-box [style*="#e1bee7"],
+[data-theme="dark"] .note-box [style*="225, 190, 231"] {
+  background-color: rgba(168, 85, 247, 0.32) !important;
+  color: #ededed !important;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Peach Orange / Copper Glow */
+[data-theme="dark"] .note-box [style*="#ffe0b2"],
+[data-theme="dark"] .note-box [style*="255, 224, 178"] {
+  background-color: rgba(251, 146, 60, 0.3) !important;
+  color: #ededed !important;
+  border-radius: 2px;
+  padding: 0 2px;
 }
 
 

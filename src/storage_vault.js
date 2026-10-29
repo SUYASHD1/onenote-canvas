@@ -213,19 +213,26 @@ class StorageVault {
       });
     }
 
-    let estimatedBytes = 0;
+    // Calculate actual real note data bytes from notebooks, pages, and canvas items
+    let realNotesBytes = 0;
+    try {
+      const allPages = await this.getAllPages();
+      if (Array.isArray(allPages) && allPages.length > 0) {
+        for (const p of allPages) {
+          realNotesBytes += JSON.stringify(p).length;
+        }
+      }
+      if (this.app.history) {
+        realNotesBytes += JSON.stringify(this.app.history.serializeState()).length;
+      }
+      if (hierarchy) {
+        realNotesBytes += JSON.stringify(hierarchy).length;
+      }
+    } catch (_) {}
 
-    if (navigator.storage && navigator.storage.estimate) {
-      try {
-        const estimate = await navigator.storage.estimate();
-        estimatedBytes = estimate.usage || 0;
-      } catch (_) {}
-    }
-
-    // Fallback estimation if quota API reports 0
-    if (estimatedBytes === 0) {
+    if (realNotesBytes === 0) {
       const serialized = JSON.stringify(this.app.history ? this.app.history.serializeState() : {});
-      estimatedBytes = serialized.length * 2;
+      realNotesBytes = serialized.length;
     }
 
     return {
@@ -233,8 +240,8 @@ class StorageVault {
       sections: secCount,
       pages: pageCount,
       noteBoxes: totalNotesCount,
-      storageBytes: estimatedBytes,
-      storageFormatted: this.formatBytes(estimatedBytes),
+      storageBytes: realNotesBytes,
+      storageFormatted: this.formatBytes(realNotesBytes),
       isPersisted: this.isPersisted,
       isMirrored: Boolean(this.mirroredFolderHandle),
       folderName: this.mirroredFolderName

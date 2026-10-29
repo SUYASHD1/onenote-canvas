@@ -32,23 +32,27 @@ class ElementFlowEngine {
   attachGripDrag(blockEl, parentNoteBox) {
     const grip = blockEl.querySelector('.block-grip');
     if (!grip) return;
+    grip.style.touchAction = 'none';
 
-    grip.addEventListener('mousedown', (e) => {
+    const onStart = (e) => {
       e.stopPropagation();
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       
-      // Store pending drag; do NOT spawn ghost immediately on mousedown
+      // Store pending drag; do NOT spawn ghost immediately on start
       this.pendingDrag = {
         blockEl,
         noteBox: parentNoteBox,
         startX: e.clientX,
         startY: e.clientY
       };
-    });
+    };
+
+    grip.addEventListener('pointerdown', onStart);
+    grip.addEventListener('mousedown', onStart);
   }
 
   initGlobalEvents() {
-    window.addEventListener('mousemove', (e) => {
+    const onMove = (e) => {
       // 1. Check if pending drag crosses threshold
       if (this.pendingDrag && !this.isDragging) {
         const dx = Math.abs(e.clientX - this.pendingDrag.startX);
@@ -63,7 +67,7 @@ class ElementFlowEngine {
 
       this.updateGhostPosition(e.clientX, e.clientY);
 
-      // Check if mouse is hovering over any note-box content
+      // Check if pointer is hovering over any note-box content
       const elementsUnder = document.elementsFromPoint(e.clientX, e.clientY);
       const noteBoxEl = elementsUnder.find(el => el.classList?.contains('note-box'));
 
@@ -72,10 +76,9 @@ class ElementFlowEngine {
       } else {
         this.hideGuideline();
       }
-    });
+    };
 
-    // Mouseup triggers drop or selection on click
-    window.addEventListener('mouseup', (e) => {
+    const onEnd = (e) => {
       if (this.pendingDrag) {
         const clickedBlock = this.pendingDrag.blockEl;
         this.selectBlock(clickedBlock);
@@ -86,7 +89,13 @@ class ElementFlowEngine {
       } else {
         this.cleanAllGhosts();
       }
-    });
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onEnd);
+    window.addEventListener('pointercancel', onEnd);
 
     // Safety net: cancel drag if window loses focus
     window.addEventListener('blur', () => this.cancelDrag());

@@ -40,6 +40,24 @@ class HistoryManager {
   }
 
   /**
+   * Fast, zero-allocation comparison to check if canvas boxes changed
+   */
+  areBoxesEqual(a, b) {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      const boxA = a[i];
+      const boxB = b[i];
+      if (boxA.id !== boxB.id || boxA.x !== boxB.x || boxA.y !== boxB.y ||
+          boxA.width !== boxB.width || boxA.height !== boxB.height ||
+          boxA.html !== boxB.html) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Push current state to undo history
    */
   pushState(actionName = 'action') {
@@ -47,10 +65,11 @@ class HistoryManager {
 
     const state = this.serializeState();
     
-    // Avoid duplicate states
+    // Avoid duplicate states without expensive JSON stringification
     if (this.undoStack.length > 0) {
       const lastState = this.undoStack[this.undoStack.length - 1];
-      if (JSON.stringify(lastState.boxes) === JSON.stringify(state.boxes)) {
+      if (this.areBoxesEqual(lastState.boxes, state.boxes) &&
+          (lastState.strokes || []).length === (state.strokes || []).length) {
         return;
       }
     }

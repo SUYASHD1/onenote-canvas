@@ -388,16 +388,21 @@ class TableModule {
     colResizer.className = 'col-resizer';
     colResizer.contentEditable = 'false';
     colResizer.title = 'Drag to adjust column width';
+    colResizer.style.touchAction = 'none';
 
-    colResizer.addEventListener('mousedown', (e) => {
-      e.preventDefault();
+    const onColResizeStart = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.cancelable) e.preventDefault();
       e.stopPropagation();
+      if (e.pointerId !== undefined && colResizer.setPointerCapture) {
+        try { colResizer.setPointerCapture(e.pointerId); } catch (_) {}
+      }
       colResizer.classList.add('resizing');
       const startX = e.clientX;
       const startW = cell.offsetWidth;
       const colIdx = cell.cellIndex;
 
-      const onMouseMove = (ev) => {
+      const onColMouseMove = (ev) => {
         const dx = ev.clientX - startX;
         const newW = Math.max(45, startW + dx);
         Array.from(table.rows).forEach(r => {
@@ -408,34 +413,51 @@ class TableModule {
         });
       };
 
-      const onMouseUp = () => {
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
+      const onColMouseUp = (ev) => {
+        if (ev && ev.pointerId !== undefined && colResizer.releasePointerCapture) {
+          try { colResizer.releasePointerCapture(ev.pointerId); } catch (_) {}
+        }
+        window.removeEventListener('mousemove', onColMouseMove);
+        window.removeEventListener('mouseup', onColMouseUp);
+        window.removeEventListener('pointermove', onColMouseMove);
+        window.removeEventListener('pointerup', onColMouseUp);
+        window.removeEventListener('pointercancel', onColMouseUp);
         colResizer.classList.remove('resizing');
         if (this.app && this.app.history) {
           this.app.history.pushState('resize_table_col');
         }
       };
 
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    });
+      window.addEventListener('mousemove', onColMouseMove);
+      window.addEventListener('mouseup', onColMouseUp);
+      window.addEventListener('pointermove', onColMouseMove);
+      window.addEventListener('pointerup', onColMouseUp);
+      window.addEventListener('pointercancel', onColMouseUp);
+    };
+
+    colResizer.addEventListener('pointerdown', onColResizeStart);
+    colResizer.addEventListener('mousedown', onColResizeStart);
 
     // 2. Row Height Resizer (Bottom edge)
     const rowResizer = document.createElement('div');
     rowResizer.className = 'row-resizer';
     rowResizer.contentEditable = 'false';
     rowResizer.title = 'Drag to adjust row height';
+    rowResizer.style.touchAction = 'none';
 
-    rowResizer.addEventListener('mousedown', (e) => {
-      e.preventDefault();
+    const onRowResizeStart = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.cancelable) e.preventDefault();
       e.stopPropagation();
+      if (e.pointerId !== undefined && rowResizer.setPointerCapture) {
+        try { rowResizer.setPointerCapture(e.pointerId); } catch (_) {}
+      }
       rowResizer.classList.add('resizing');
       const startY = e.clientY;
       const tr = cell.closest('tr');
       const startH = tr.offsetHeight;
 
-      const onMouseMove = (ev) => {
+      const onRowMouseMove = (ev) => {
         const dy = ev.clientY - startY;
         const newH = Math.max(26, startH + dy);
         tr.style.height = `${newH}px`;
@@ -444,18 +466,30 @@ class TableModule {
         });
       };
 
-      const onMouseUp = () => {
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
+      const onRowMouseUp = (ev) => {
+        if (ev && ev.pointerId !== undefined && rowResizer.releasePointerCapture) {
+          try { rowResizer.releasePointerCapture(ev.pointerId); } catch (_) {}
+        }
+        window.removeEventListener('mousemove', onRowMouseMove);
+        window.removeEventListener('mouseup', onRowMouseUp);
+        window.removeEventListener('pointermove', onRowMouseMove);
+        window.removeEventListener('pointerup', onRowMouseUp);
+        window.removeEventListener('pointercancel', onRowMouseUp);
         rowResizer.classList.remove('resizing');
         if (this.app && this.app.history) {
           this.app.history.pushState('resize_table_row');
         }
       };
 
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    });
+      window.addEventListener('mousemove', onRowMouseMove);
+      window.addEventListener('mouseup', onRowMouseUp);
+      window.addEventListener('pointermove', onRowMouseMove);
+      window.addEventListener('pointerup', onRowMouseUp);
+      window.addEventListener('pointercancel', onRowMouseUp);
+    };
+
+    rowResizer.addEventListener('pointerdown', onRowResizeStart);
+    rowResizer.addEventListener('mousedown', onRowResizeStart);
 
     cell.appendChild(colResizer);
     cell.appendChild(rowResizer);

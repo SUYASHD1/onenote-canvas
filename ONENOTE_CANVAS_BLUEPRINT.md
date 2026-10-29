@@ -1,119 +1,120 @@
 # 🗺️ OneNote Spatial Canvas — Complete Architecture Blueprint & Knowledge Base
 
-> **System Status:** Production Ready & Verified (50/50 Automated E2E Tests Passing — 100%)  
-> **Core Philosophy:** A pure, zero-compromise spatial note-taking web application inspired by **Microsoft OneNote**. Features an anchored auto-growing canvas, draggable margin grips with pop-out/pop-in flow, instant table creation with 4 layout themes, built-in image cropping, a universal AI/Web Math Engine, 3-tier notebook hierarchy, multi-store IndexedDB vault, smart cursor-inspecting ribbon, and pressure-sensitive digital inking.
+> **System Status:** Production Ready & Verified (62/62 Automated E2E Tests Passing — 100%)  
+> **Core Philosophy:** A pure, zero-compromise spatial note-taking web application inspired by **Microsoft OneNote**. Features an anchored infinite auto-growing canvas, draggable margin grips with pop-out/pop-in flow, instant table creation with 4 layout themes, built-in image cropping, a universal AI/Web Math Engine, 3-tier notebook hierarchy, multi-store IndexedDB vault, smart cursor-inspecting ribbon, pressure-sensitive digital inking, Executive Dark Mode with Midnight Glow highlighters, 100% Offline Airplane Mode PWA, and smart boundary edge auto-scrolling.
 
 ---
 
 ## 🏛️ 1. System Architecture & Component Map
 
-The codebase is built strictly on modular, decoupled Vanilla JavaScript (ES6+) and CSS, maintaining clean separation of concerns with files structured around ~350 lines for maximum maintainability:
+The codebase is built strictly on modular, decoupled Vanilla JavaScript (ES6+), HTML5, and CSS, maintaining clean separation of concerns with zero heavy framework bloat:
 
 ```
 Canvas/
-├── index.html                   <-- Structure: App header, Smart Ribbon, 2-Column Sidebar, Canvas, Modals (~380 lines)
-├── styles.css                   <-- Design System: Ribbon, light theme sidebar, ghost scrollbars, inking layers (~1200 lines)
-├── components.css               <-- Object Styles: 4 Table layouts, Image Cards, Equation Cards, Math pills (~440 lines)
+├── index.html                   <-- Structure: App header, Smart Ribbon, 2-Column Sidebar, Infinite Viewport, Modals
+├── styles.css                   <-- Design System: Ribbon, daylight/dark mode themes, ghost scrollbars, inking layers
+├── components.css               <-- Object Styles: 4 Table layouts, Image Cards, Equation Cards, Math pills
+├── manifest.json                <-- PWA Manifest: Standalone mode, theme-color #7719aa, crisp vector & PNG icons
+├── icon.svg                     <-- Master Vector Icon: OneNote purple squircle, subtle grid, clean white "N"
+├── icon-192.png                 <-- High-Res PWA App Icon (192x192)
+├── icon-512.png                 <-- High-Res PWA Splash Icon (512x512)
+├── sw.js                        <-- Service Worker: 100% Offline Airplane Mode, Fresh-First strategy (v1.5.2)
 ├── src/
-│   ├── app.js                   <-- Master coordinator, Ribbon actions, universal HTML outline parser (~790 lines)
-│   ├── canvas.js                <-- Anchored canvas, zero-drift zoom, kinetic coasting, marquee select (~340 lines)
-│   ├── note_box.js              <-- Container lifecycle, header drag, 8-point resize, selection state (~475 lines)
-│   ├── element_flow.js          <-- Margin hover grips (:::), Pop-Out detaching, Pop-In blue drop guideline (~330 lines)
-│   ├── table_module.js          <-- Word+Tab auto-detection, 4 layout styles, row/col add/remove/resize (~510 lines)
-│   ├── image_module.js          <-- 8-handle perimeter scaling, canvas crop tool, caption locking (~400 lines)
-│   ├── keyboard_shortcuts.js    <-- 3-tier keyboard controller, Alt+Shift arrows, clipboard paste pipeline (~660 lines)
-│   ├── history_manager.js       <-- Unified undo/redo snapshot stack, debouncing, stroke serialization (~230 lines)
-│   ├── sidebar.js               <-- 3-Tier hierarchy: Notebooks, Sections, Pages, clean blank guarantee (~595 lines)
-│   ├── storage_vault.js         <-- Multi-gigabyte 4-store IndexedDB, safe-lock, .notes backup export/import (~400 lines)
-│   ├── ribbon_controller.js     <-- Two-Way Mirror cursor inspection, 2-in-1 split color tools, selection lock (~312 lines)
-│   ├── ink_engine.js            <-- Floating mode puck, pressure pen, under-text highlighter, shape snapping (~340 lines)
-│   ├── markdown_module.js       <-- AI Chatbot Markdown parser (headings, tables, images, block math) (~340 lines)
-│   └── math_module.js           <-- Universal Math Engine: KaTeX rendering & native MathML Core fallback (~465 lines)
+│   ├── app.js                   <-- Master coordinator, Ribbon actions, universal HTML outline parser, Dark Mode toggle
+│   ├── canvas.js                <-- Infinite anchored canvas, zero-drift zoom, kinetic coasting, marquee select, edge scroll engine
+│   ├── note_box.js              <-- Container lifecycle, GPU header drag, 8-point resize, selection state, auto-expansion
+│   ├── element_flow.js          <-- Margin hover grips (:::), Pop-Out detaching, Pop-In radiant blue drop guideline
+│   ├── table_module.js          <-- Word+Tab auto-detection, 4 layout styles, row/col add/remove/resize
+│   ├── image_module.js          <-- 8-handle perimeter scaling, canvas crop tool, caption locking
+│   ├── keyboard_shortcuts.js    <-- 4-tier keyboard controller, Alt+Shift arrows, clipboard paste pipeline
+│   ├── history_manager.js       <-- Unified undo/redo snapshot stack, debouncing, stroke serialization
+│   ├── sidebar.js               <-- 3-Tier hierarchy: Notebooks, Sections, Pages, clean blank guarantee
+│   ├── storage_vault.js         <-- Multi-gigabyte 4-store IndexedDB, safe-lock, .notes backup export/import
+│   ├── ribbon_controller.js     <-- Two-Way Mirror cursor inspection, 2-in-1 split color tools, selection lock
+│   ├── ink_engine.js            <-- Clean canvas inking, pressure pen, under-text highlighter, smart ink inversion
+│   ├── markdown_module.js       <-- AI Chatbot Markdown parser (headings, tables, images, block math)
+│   └── math_module.js           <-- Universal Math Engine: KaTeX rendering & native MathML Core fallback
 └── tests/
-    └── e2e_puppeteer.js         <-- 50-capability automated browser test suite (Microsoft Edge driver) (~1450 lines)
+    └── e2e_puppeteer.js         <-- 62-capability automated browser test suite (Microsoft Edge driver)
 ```
 
 ---
 
-## 🌟 2. Feature Inventory
+## 🌟 2. Feature Inventory Across Updates
 
-### 2.1 Anchored, Elastic Spatial Canvas
-* **Fixed (0,0) Origin:** Anchored firmly at the top-left corner. No disorienting infinite negative space or drifting objects.
-* **Elastic Growth:** Automatically expands rightwards and downwards as cards are moved or text expands.
-* **Double-Click Creation:** Double-clicking anywhere on the canvas instantly spawns a note card at that exact coordinate.
-* **Pan & Zoom:** Smooth navigation via trackpad or middle-mouse drag, with zoom levels from 50% to 200%.
+### 2.1 Infinite Anchored Spatial Canvas & Edge Auto-Scrolling
+* **Fixed (0,0) Origin:** Anchored firmly at top-left. No drifting or disorienting negative space coordinates.
+* **Perpetual Infinite Auto-Expansion:** Canvas surface automatically and instantaneously expands ahead of the viewport as cards are moved, dragged, or scrolled past boundaries.
+* **Smart Boundary Edge Auto-Scrolling:** Moving a note card or dragging a marquee selection lasso within 80px of any screen boundary smoothly glides the canvas viewport at proportional speeds.
+* **Hardware GPU Acceleration:** Card movements utilize `translate3d(x, y, 0)` with `will-change: transform`, allowing low-end hardware to glide notes at 60fps with zero CPU layout reflows.
+* **Double-Click Creation:** Double-clicking anywhere on the canvas immediately spawns a note card at that exact coordinate.
+* **Cursor-Anchored Zero-Drift Zooming:** Zooms between 50% and 200% maintaining the exact pixel directly under the cursor.
 
-### 2.2 Authentic Note Containers & 8-Point Perimeter Resize
-* **OneNote Header Bar:** Crisp grey header containing the move grip (`:::`) and delete button (`×`).
+### 2.2 Executive Dark Mode & OneNote Purple System (Update 1.5)
+* **Warm Charcoal Atmosphere (`#282828`):** Deep, eye-friendly OneNote dark theme designed for extended study and writing sessions.
+* **OneNote Signature Purple Accents (`#7719aa` / `#9b30d9`):** Accent highlights, focus rings, and ribbon indicators.
+* **Smart Pen & Highlighter Inversion:** Digital inking strokes automatically adapt—black ink intelligently converts to luminous cream-white (`#f0f0f0`) in dark mode and restores to black in daylight.
+* **Midnight Glow Text Highlighters (Option A):** Text highlighted in yellow, pink, green, blue, purple, or orange automatically converts into luminous midnight ruby/amber glows with crisp `#ededed` white text, guaranteeing 100% contrast with zero dark-on-dark unreadability.
+* **Instant Keyboard & Ribbon Toggle:** Easily toggle with one click or shortcut; persists choice across browser sessions via `localStorage`.
+
+### 2.3 100% Offline Airplane Mode & Standalone PWA (Update 1.5)
+* **Standalone PWA Installation:** Configured via `manifest.json` with high-resolution vector and PNG icons, allowing the app to install as an independent desktop window.
+* **Offline Airplane Mode Service Worker (`sw.js`):** Pre-caches essential app shell files.
+* **Fresh-First (Network-First) Strategy:** Always loads the latest code directly when connected to development or internet, and silently updates the local disk cache in the background. If offline (airplane mode), seamlessly falls back to the local cache with zero interruption.
+* **Pointer-Free Vector Icon:** Pure SVG vector icon ([icon.svg](file:///c:/Users/suyas/Desktop/antigravity/Canvas/icon.svg)) featuring the purple squircle, spatial grid, and centered bold OneNote "N" with the corner pointer removed for a sleek, modern emblem.
+
+### 2.4 Authentic Note Containers & 8-Point Perimeter Resize
+* **OneNote Move Header Bar:** Clean header with move handle (`:::`) and delete button (`×`).
 * **Universal 8-Point Perimeter Resize:** Every container, image card, and table features 8 perimeter resize handles (4 corners for proportional scaling, 4 edges for directional stretching).
 * **Word Wrapping & Content Flow:** Text wraps dynamically to the container width.
 
-### 2.3 Pop-Out & Pop-In (Fluid Structural Rearrangement)
+### 2.5 Pop-Out & Pop-In (Fluid Structural Rearrangement)
 * **Left-Margin Hover Grip (`:::`):** Appears beside every paragraph, image, table, or equation.
 * **Rearrange Inside Container:** Dragging a grip up or down reorders elements smoothly within the note card.
 * **Pop-Out (Detach):** Dragging a grip outside the container detaches that item and spawns a **brand-new note card** at the release point.
-* **Pop-In (Merge via Blue Guideline):** Dragging any item or note card over another card illuminates a **live, radiant blue insertion guideline** between paragraphs. Releasing drops the content into that exact spot.
+* **Pop-In (Merge via Radiant Blue Line):** Dragging any item or note card over another card illuminates a **live, radiant blue insertion guideline** between paragraphs. Releasing drops the content into that exact spot.
 
-### 2.4 Table Engine (Auto-Detection & 4 Layout Themes)
+### 2.6 Table Engine (Auto-Detection & 4 Layout Themes)
 * **Word + `Tab` Auto-Detection:** Typing a word and pressing `Tab` automatically converts that text line into a structured table.
-* **4 Layout Formats (One-Click Switching):**
-  1. *Classic Grid:* Sharp borders on all cells for standard notes.
-  2. *Zebra Banded:* Alternating shaded rows for effortless scanning of dense data.
-  3. *Modern Accent:* Sleek header bar with soft horizontal dividers and no vertical lines.
-  4. *Data Matrix:* Monospaced, compact cell padding with light grid lines for financial and status data.
+* **4 Layout Formats (One-Click Switching):** Classic Grid, Zebra Banded, Modern Accent, and Data Matrix.
 * **In-Cell Image Pasting:** Pasting pictures into a table cell scales the picture neatly to fit inside the cell without breaking layout.
 * **Interactive Resizers:** Drag-to-resize columns and rows with safety limits preventing cell collapse.
 
-### 2.5 Image Sizing, Locked Captions & In-Place Crop
+### 2.7 Image Sizing, Locked Captions & In-Place Crop
 * **Locked Captions:** Captions are permanently bound to images; detaching or moving an image keeps its caption intact.
 * **Built-In Crop Tool:** Clicking "Crop" opens an in-place cropping box directly over the canvas. Dragging crop boundaries and clicking "Apply" slices the image immediately using HTML5 Canvas—no external software needed.
-* **Caption Toggle:** Captions can be shown or hidden on demand via the floating image toolbar.
 
-### 2.6 Universal Clipboard & AI Chatbot Markdown Pipeline
-* **Natural Reading Order:** Pasted content maintains 100% authentic reading sequence (Paragraph 1 → Picture → Paragraph 2 → Equation), never allowing pictures or formulas to slide to the bottom.
-* **AI Chatbot Markdown Cleaning:**
-  * Clean bold headings (`### Title` → styled heading with zero hashtag clutter).
-  * Markdown tables (`| A | B |` and borderless `A | B`) → live App Tables with layout format switchers.
-  * Image markdown (`![Alt](url)` or linked `[![Alt](url)](link)`) → official Image Cards with captions.
-  * Lists and bullet points rendered cleanly.
-* **Clean Reading Filter:** Strips clutter from copied articles (footnote citations `[1]`, `[2, 3]`, `[note 1]`, `[edit]` links, blue URL underlines, and intrusive website background colors).
+### 2.8 Universal Clipboard & AI Chatbot Markdown Pipeline
+* **Natural Reading Order:** Pasted content maintains authentic reading sequence (Paragraph 1 → Picture → Paragraph 2 → Equation), never allowing pictures or formulas to slide to the bottom.
+* **AI Chatbot Markdown Cleaning:** Converts `###` headings, Markdown tables (`| A | B |`), and picture syntax (`![Alt](url)`) into live App Objects with zero hashtag clutter.
+* **Clean Reading Filter:** Strips citation numbers (`[1]`, `[2, 3]`), `[edit]` markers, and blue underlines.
 
-### 2.7 Universal Web & AI Math Engine (KaTeX + MathML Core)
-* **Universal Math Detective:** Multi-source cascading extractor that detects formulas from:
-  1. Wikipedia: `data-mw` source data and `alttext` attributes on `<math>`.
-  2. KaTeX & MathJax: `<annotation encoding="application/x-tex">`.
-  3. MathJax 2 & Blogs: `<script type="math/tex">` and data attributes (`data-latex`).
-  4. Academic Journals (Nature, IEEE, Springer): Authentic native MathML Core.
-  5. AI Chats (ChatGPT, Claude): Bracket equations (`\[ ... \]`, `$$ ... $$`, and `\begin{equation}`).
-* **Textbook Quality (The KaTeX Artist):** Extracted formulas are rendered with crisp fractions, square roots, Greek letters ($\mu$, $\nu$, $\kappa$), tensor indices ($\Gamma^\mu_{\alpha\beta}$), and text labels.
-* **Dual Display Forms:**
-  * *Equation Cards:* Standalone display equations render as interactive cards with hover grips, editing tools, and live LaTeX editors.
-  * *Inline Math Badges:* Formulas inside sentences (e.g., $e_y$, $K_p$, $G_{\mu\nu}$) render seamlessly as inline badges without breaking sentence flow.
+### 2.9 Universal Web & AI Math Engine (KaTeX + MathML Core)
+* **Universal Math Detective:** Multi-source cascading extractor that detects formulas from Wikipedia (`data-mw`, `alttext`), KaTeX, MathJax, academic MathML, and AI chat brackets (`\[ ... \]`, `$$ ... $$`).
+* **Textbook Quality (The KaTeX Artist):** Renders crisp fractions, square roots, Greek letters ($\mu$, $\nu$, $\kappa$), tensor indices ($\Gamma^\mu_{\alpha\beta}$), and text labels.
+* **Dual Display Forms:** Standalone interactive Equation Cards with live LaTeX editors, plus inline math badges inside sentences.
 
-### 2.8 3-Tier Keyboard Controller & Unified History
-* **Tier 1 (Typing):** `Backspace` and `Delete` edit text only; line-start backspace un-indents or pulls sentences up. Note boxes cannot be accidentally destroyed while typing.
-* **Tier 2 (Item Selected):** Clicking an image or table selects it; pressing `Delete` deletes only that item.
-* **Tier 3 (Container Selected):** Clicking the container header selects the card; pressing `Delete` removes the card.
-* **Unified History Manager:** Seamless `Ctrl+Z` (Undo) and `Ctrl+R` / `Ctrl+Y` (Redo) tracking text edits, spatial moves, and element detachments.
+### 2.10 Three-Tier Notebook Hierarchy & Storage Vault
+* **3-Tier Organization:** Notebooks → Sections → Pages with instant switching and clean blank canvas guarantee.
+* **Multi-Store IndexedDB Engine:** 4 partitioned stores (Notebooks, Sections, Pages, NoteCards) with persistent storage safe-lock.
+* **One-Click Backup & Restore:** Complete library backup export to safe `.notes` files, and local folder mirroring.
 
 ---
 
 ## 🎚️ 3. Canvas Multi-Level Control Hierarchy (The 4 Canvas Levels)
 
-A key engineering breakthrough in our spatial canvas is the strict separation of **interactive levels**. Without this hierarchy, actions at one level (like editing text or cropping an image) would conflict with actions at another level (like dragging a container or panning the canvas).
-
 ```
 +-----------------------------------------------------------------------------------------+
 | LEVEL 4: FIXED OVERLAYS & HUD (Z-Index 1000 - 9999)                                     |
-| Ribbon Toolbar, In-Place Crop Modal, Status Bar with live zoom & coordinates            |
+| Ribbon Toolbar, In-Place Crop Modal, Status Bar with live zoom & dimensions             |
 +-----------------------------------------------------------------------------------------+
   |
   +---> LEVEL 0: GLOBAL SPATIAL VIEWPORT (Z-Index 0)
-        Anchored (0,0) Origin, Elastic Auto-Growth, Pan/Zoom (50%-200%), Double-Click Spawn
+        Anchored (0,0) Origin, Perpetual Auto-Growth, Pan/Zoom (50%-200%), Edge Auto-Scroll
         Coordinate Normalizer: (screen - stageOffset) / zoomLevel = exact canvas pixel
         |
         +---> LEVEL 1: NOTE CONTAINER LEVEL (Z-Index 10 - 100, dynamic active elevation)
-              Header Bar Drag Grip (:::), 8-Point Perimeter Resize, Container Selection & Delete
+              Header Bar Drag Grip (:::), GPU Transform, 8-Point Resize, Container Select/Delete
               |
               +---> LEVEL 2: BLOCK & FLOW LEVEL (Structural Units)
                     Paragraphs, Tables, Image Cards, Equation Cards
@@ -124,103 +125,41 @@ A key engineering breakthrough in our spatial canvas is the strict separation of
                           Image 8-Handle Resizers & Crop Slice, Equation Edit & Inline Math Pills
 ```
 
-### 3.1 Level 0 — The Global Spatial Viewport (Infinite Stage)
-* **Scale-Normalized Coordinate Mapping:**
-  ```javascript
-  // Screen to Canvas coordinate translation matrix:
-  const x = (clientX - stageRect.left) / this.zoomLevel;
-  const y = (clientY - stageRect.top) / this.zoomLevel;
-  ```
-  Every mouse click, double-click spawn, and drag drop operation calculates exact pixel coordinates regardless of whether the user is zoomed out at 50% or zoomed in at 200%.
-* **Elastic Dynamic Growth (`ensureBounds`):**
-  Continuously monitors all note boxes. If any card is dragged within 400px of the right or bottom boundary, the canvas automatically expands in that direction without screen stutter.
-* **Global Navigation:** Middle-mouse drag or `Alt + Drag` pans the viewport smoothly, while `Ctrl + Mouse Wheel` zooms anchored around the cursor.
-
-### 3.2 Level 1 — The Note Container Level (`.note-box`)
-* **Spatial Placement:** Positioned absolutely in canvas coordinate space via `style.left` and `style.top`.
-* **Dynamic Z-Index Elevation:** Clicking any note card brings it forward (`z-index: 10 + activeIndex`), ensuring the card being worked on is never obscured by surrounding cards.
-* **Whole-Card Movement:** Handled exclusively via the grey top header bar move grip (`:::`), isolating whole-card movement from inner paragraph rearrangement.
-* **Universal 8-Point Perimeter Resizing:** 8 handles positioned around the perimeter allow bidirectional scaling with live width/height updates and minimum boundaries preventing collapse.
-
-### 3.3 Level 2 — The Block & Flow Level (`.canvas-block`)
-* **Left-Margin Hover Grips (`:::`):** Appears to the left of each individual block (paragraph, table, image, equation).
-* **In-Container Reordering:** Dragging vertically within the container smoothly reorders blocks.
-* **Pop-Out Detaching:** Dragging a grip beyond the boundaries of the container triggers an instant detach, creating a fresh note box at the exact release point.
-* **Pop-In Merging & Live Blue Guideline:** Dragging any block or container over another note card calculates the nearest vertical gap between children using `getBoundingClientRect()`, illuminating a radiant blue guideline and dropping the element into that exact slot.
-
-### 3.4 Level 3 — In-Element & Micro-Interaction Level
-* **Typing Protection (Immune Backspace):** Cursor position is checked via `window.getSelection()`. Backspace at the beginning of an empty line un-indents or merges paragraphs, but can **never** destroy the parent container.
-* **Table Cell Matrix:** `Tab` moves to the next cell or spawns a new column; `Enter` creates a new row; cells accept embedded pictures with auto-fit boundaries.
-* **Image Micro-Controls:** Bounded 8-handle perimeter scaling, locked captions, and interactive cropping modal.
-* **Equation Micro-Controls:** Interactive Equation Cards with Edit/Delete toolbars, double-click LaTeX prompt, and inline math badges (`<span class="inline-math">`) that live inside sentences.
-
-### 3.5 Event Isolation Architecture (Preventing Cross-Level Conflicts)
-* **`contentEditable="false"` Protection:** All UI controls (buttons, grips, resize handles, toolbars) are marked non-editable so browser text selection engines cannot trap cursors or duplicate buttons on `Enter`.
-* **`e.stopPropagation()` Containment:** Clicking or dragging micro-controls stops event bubbling, preventing the canvas from triggering double-click note creation or background selection changes.
-
-### 3.6 Universal Keyboard Shortcut & Undo/Redo Matrix Across All Levels
-
-The application features a strict **4-Level Keyboard Controller Engine** (`src/keyboard_shortcuts.js`) that isolates text typing from structural operations, ensuring you can never accidentally delete a note card while writing notes.
-
-| Level | Shortcut / Key | Target Object | Action & Safety Isolation | Undo/Redo Integration |
-|---|---|---|---|---|
-| **Level 0: Canvas** | `Ctrl + V` | Entire Canvas | Pastes copied container, image, or table at exact mouse cursor position. | Pushes new state to `HistoryManager` undo stack. |
-| **Level 0: Canvas** | `Ctrl + Z` | Canvas Stage | Undoes the last card movement, deletion, paste, or card addition. | Steps back 1 state in spatial history. |
-| **Level 0: Canvas** | `Ctrl + Y` / `Ctrl + Shift + Z` / `Ctrl + R` | Canvas Stage | Redoes the last undone spatial action. Intercepts browser reload (`Ctrl+R`) to protect notes. | Steps forward 1 state in spatial history. |
-| **Level 0: Canvas** | `Middle Mouse` / `Alt + Drag` | Viewport | Pans the infinite spatial canvas in any direction. | Real-time viewport offset (non-destructive). |
-| **Level 0: Canvas** | `Ctrl + Mouse Wheel` | Viewport | Zooms between 50% and 200% centered around the mouse cursor. | Real-time zoom level (non-destructive). |
-| **Level 1: Container** | `Delete` / `Backspace` | Header selected card | Permanently deletes the selected note container and its contents. | Pushes deletion state to Undo stack. |
-| **Level 1: Container** | `Ctrl + C` | Selected Container | Deep-copies the entire container including all nested paragraphs, images, tables, and math. | Internal clipboard store + plain text fallback. |
-| **Level 1: Container** | `Ctrl + X` | Selected Container | Cuts entire container and places in clipboard, removing it from canvas. | Pushes cut state to Undo stack. |
-| **Level 1: Container** | `Ctrl + A` (3rd press) | Active Container | Selects the entire container card (selecting its header). | Focus / Selection state. |
-| **Level 2: Block** | `Delete` / `Backspace` | Highlighted block (Image / Table) | Deletes only that highlighted item, leaving the parent container 100% intact. | Pushes block deletion to Undo stack. |
-| **Level 2: Block** | `Ctrl + C` | Highlighted Image / Table | Copies the highlighted object (images with caption; tables with full grid structure). | Internal structured clipboard. |
-| **Level 2: Block** | `Alt + Shift + Up / Down` | Paragraph / Block | Reorders the block up or down within the container. | Pushes reorder to Undo stack. |
-| **Level 2: Block** | `Ctrl + Enter` | Paragraph Block | Splits / creates a brand-new draggable paragraph block with hover grip (`:::`) and triggers a signature visual glow pulse. | Pushes paragraph split to Undo stack. |
-| **Level 2: Block** | `Tab` / `Shift + Tab` | Paragraph Block | Indents (+24px) or outdents (-24px) the block when cursor is at line start. | Pushes indent state to Undo stack. |
-| **Level 2: Block** | `Alt + =` | Active Block | Inserts a new interactive OneNote LaTeX Equation Card. | Pushes equation creation to Undo stack. |
-| **Level 3: Inline Text** | `Backspace` / `Delete` | Text Cursor inside line | Deletes characters or merges empty lines. **Container is 100% immune to deletion.** | Browser text undo (`execCommand('undo')`). |
-| **Level 3: Inline Text** | `Ctrl + A` (1st press) | Active Block | Selects only the text inside the current line/block. | Native text range selection. |
-| **Level 3: Inline Text** | `Ctrl + A` (2nd press) | Container Content | Expands selection to all text and items inside the current container. | Native text range selection. |
-| **Level 3: Inline Text** | `Triple-Click` | Paragraph Text | Instantly selects the entire paragraph text cleanly. | Native paragraph range selection. |
-| **Level 3: Table Cells** | `Tab` | Table Cell | Jumps cursor to the next cell. If at the end of a row, creates a new cell/column automatically. | Cell navigation / structure growth. |
-| **Level 3: Table Cells** | `Enter` | Table Cell | Adds a new table row directly below current row without breaking the table. | Pushes row creation to Undo stack. |
-
-#### Multi-Level Undo / Redo Engine Mechanics
-1. **Typing-Level Undo:** When a user is typing text inside a line, pressing `Ctrl+Z` allows the browser's native text undo engine to step backwards through character keystrokes smoothly.
-2. **Spatial / Structural-Level Undo:** If no text is selected or if the text cursor is at rest, pressing `Ctrl+Z` activates the global `HistoryManager`, restoring deleted cards, undoing dragged movements, reversing block reordering, and restoring detached cards.
-3. **Safe Redo (`Ctrl+R`, `Ctrl+Y`, `Ctrl+Shift+Z`):** Many users habitually press `Ctrl+R` expecting "Redo" (as in Microsoft Office), which normally destroys web canvas state by refreshing the page. Our engine captures `Ctrl+R` during the capture phase (`window.addEventListener('keydown', ..., true)`), suppresses browser refresh, and safely executes Redo.
-
 ---
 
-## 🛠️ 4. Development Chronicle: Problems Encountered & Architectural Solutions
+## 🛠️ 4. Development Chronicle: Pitfalls Encountered & Architectural Solutions
 
-Below is the complete engineering record of real-world bugs diagnosed and fixed across the development cycle:
+Below is the complete engineering record of real-world pitfalls diagnosed and resolved:
 
 | # | Challenge / Symptom | Root Cause | Architectural Solution |
 |---|---------------------|------------|------------------------|
-| **1** | **Accidental Box Deletion on Backspace** | Pressing backspace in an empty text block caused the browser's default contenteditable behavior to bubble up and delete the parent `.note-box`. | Implemented a **3-Tier Keyboard Controller** in `src/keyboard_shortcuts.js`. Intercepts Backspace, checks cursor offset using `Selection.anchorOffset`, merges paragraph text when appropriate, and strictly forbids container deletion while in typing mode. |
-| **2** | **Corrupted DOM from Editable Controls** | UI buttons (Delete, Crop, Layout Switcher) placed inside note cards were duplicated or broken when users typed or pressed `Enter`. | Enforced strict UI containment: All buttons, menus, and resize handles are permanently flagged `contentEditable="false"`, `user-select: none`, and given protective CSS classes. |
-| **3** | **Table Column Collapse & Overflow** | Standard HTML tables collapsed to fit text or overflowed note containers without way to adjust column widths. | Wrapped tables in an isolated `.table-wrapper` with 8-point perimeter resize handles and draggable column/row dividers with hard minimum-size safeguards. |
-| **4** | **Coordinate Drift During Drag & Detach** | Dragging margin grips to detach items caused cards to jump because screen coordinates were used without accounting for canvas pan and zoom. | Built a spatial transform matrix in `src/canvas.js` (`screenToCanvas(x, y)`), translating raw mouse events into exact canvas coordinates. |
+| **1** | **Accidental Box Deletion on Backspace** | Pressing backspace in an empty text block caused browser contenteditable behavior to delete the parent `.note-box`. | Implemented a **4-Tier Keyboard Controller** in `src/keyboard_shortcuts.js`. Intercepts Backspace, checks cursor offset, merges lines when appropriate, and strictly forbids container deletion while in typing mode. |
+| **2** | **Corrupted DOM from Editable Controls** | UI buttons placed inside note cards were duplicated or broken when users typed or pressed `Enter`. | Enforced strict UI containment: All buttons, menus, and resize handles are permanently flagged `contentEditable="false"`, `user-select: none`. |
+| **3** | **Table Column Collapse & Overflow** | Standard HTML tables collapsed to fit text or overflowed note containers without column width control. | Wrapped tables in an isolated `.table-wrapper` with 8-point perimeter resize handles and draggable column/row dividers with hard minimum-size safeguards. |
+| **4** | **Coordinate Drift During Drag & Detach** | Dragging margin grips caused cards to jump because screen coordinates ignored canvas pan and zoom. | Built a spatial transform matrix in `src/canvas.js` (`clientToCanvas(x, y)`), translating raw mouse events into exact canvas coordinates. |
 | **5** | **Lost Captions During Image Detach** | Moving or detaching an image left its caption behind as an orphaned text line. | Implemented **Caption Locking** in `src/image_module.js`. Images and captions are unified inside a single `.image-card` DOM unit that moves, resizes, and detaches as one object. |
-| **6** | **Displaced Pictures Sliding to Bottom** | Pasting rich web articles caused pictures to jump to the very bottom of the note card instead of staying between paragraphs. | Discovered that unmatched images were being appended at the end (`units.push(...htmlImgs)`). Refactored to a **Single Sequential Pipeline** in `parseHTMLToOutlineUnits` that visits DOM nodes strictly in natural reading sequence. |
-| **7** | **Citation Clutter & Broken Hyperlinks** | Pasting Wikipedia articles brought in citation numbers (`[1]`, `[2, 3]`), `[edit]` markers, and blue underlines. | Developed a multi-stage sanitizer in `src/app.js`: Regex `/\[\s*(?:\d+|note\s*\d+|[a-z])(?:\s*[,;–-]\s*(?:\d+|note\s*\d+|[a-z]))*\s*\]|\[edit\]/gi` strips footnote noise, while link unwrapping replaces `<a>` with plain text while keeping the words. |
-| **8** | **Nested Braces Breaking Fractions** | Complex formulas like `{d^{2}x^{\mu} \over ds^{2}}` failed regex `\{([^{}]+)\s*\\over\s*([^{}]+)\}` because powers contained nested curly braces `{...}`. | Replaced regex with a **Balanced-Brace Depth Scanner** in `src/math_module.js` (`parseFractions`). Traverses backwards and forwards from `\over`, matching opening and closing braces regardless of nested powers or indices. |
-| **9** | **HTML Multi-Equation Dropping** | Copying Wikipedia articles with 10+ equations captured only the first equation; all other equations and paragraphs disappeared. | Multi-block containers (`div.mw-parser-output`, `<section>`, `<dl>`) were being classified as a single math element if `querySelector('math')` was found, returning early. Changed to **Recursive Container Traversal**, visiting every child element step-by-step. |
-| **10** | **AI Math Brackets Rendered as Raw Text** | ChatGPT/Claude pastes (`\[ \text{Steering correction} ... \]`) appeared as raw text brackets in web paste. | Web clipboard formats include HTML. Added in-place bracket math detection (`\[ ... \]`, `$$ ... $$`, `\begin{equation}`) to `parseHTMLToOutlineUnits`, promoting AI equations to official Equation Cards. |
-| **11** | **Incomplete Equations (`GR - g = T`)** | Wikipedia formulas rendered missing Greek letters ($\mu$, $\nu$, $\kappa$), tiny fractions ($\frac{1}{2}$), and tensors, leaving only loose English letters. | Wikipedia hides authentic LaTeX in `alttext` and `data-mw` (not standard `alt`). Upgraded `extractMathInfo` to inspect `data-mw`, `alttext`, `<annotation>`, and script tags, feeding the complete formula to **KaTeX** for 100% textbook quality. |
-| **12** | **Zero Visual Feedback on Paragraph Creation** | Pressing `Ctrl+Enter` or clicking the ribbon `¶ Paragraph` button created an empty paragraph block (`<br>`) with a hidden hover grip (`opacity: 0`), leaving users unaware if a block was actually created. | Implemented a **Signature Visual Pulse Feedback**: Newly created blocks receive `.block-spawn-pulse`, flashing with a delicate OneNote purple accent glow (`rgba(119, 25, 170, 0.22)`) for 550ms before smoothly dissolving. Added `:active` press scaling (`transform: scale(0.96)`) to ribbon buttons for instant tactile confirmation. |
+| **6** | **Displaced Pictures Sliding to Bottom** | Pasting web articles caused pictures to jump to the very bottom of the card instead of staying between paragraphs. | Refactored to a **Single Sequential Pipeline** in `parseHTMLToOutlineUnits` that visits DOM nodes strictly in natural reading sequence. |
+| **7** | **Citation Clutter & Broken Hyperlinks** | Pasting Wikipedia articles brought in citation numbers (`[1]`, `[2, 3]`), `[edit]` markers, and blue underlines. | Developed a multi-stage sanitizer in `src/app.js` using regex to strip citation brackets and unwrap hyperlinks to plain text. |
+| **8** | **Nested Braces Breaking Fractions** | Complex formulas like `{d^{2}x^{\mu} \over ds^{2}}` failed regex because powers contained nested curly braces. | Replaced regex with a **Balanced-Brace Depth Scanner** in `src/math_module.js` (`parseFractions`) traversing backwards and forwards matching bracket depth. |
+| **9** | **HTML Multi-Equation Dropping** | Copying Wikipedia articles with 10+ equations captured only the first equation. | Multi-block containers were classifying as a single math element. Changed to **Recursive Container Traversal** visiting every child element step-by-step. |
+| **10** | **AI Math Brackets Rendered as Raw Text** | ChatGPT/Claude bracket pastes (`\[ ... \]`) appeared as raw text. | Added bracket math detection (`\[ ... \]`, `$$ ... $$`, `\begin{equation}`) to `parseHTMLToOutlineUnits`, promoting formulas to official Equation Cards. |
+| **11** | **Incomplete Equations (`GR - g = T`)** | Wikipedia formulas rendered missing Greek letters ($\mu$, $\nu$, $\kappa$), fractions, and tensors. | Upgraded `extractMathInfo` to inspect `data-mw`, `alttext`, `<annotation>`, and script tags, feeding complete LaTeX to **KaTeX** for 100% textbook quality. |
+| **12** | **Zero Visual Feedback on Block Creation** | Pressing `Ctrl+Enter` or clicking ribbon `¶ Paragraph` created an empty block with hidden grip, leaving users unsure if creation worked. | Implemented a **Signature Visual Pulse Feedback**: Newly created blocks flash `.block-spawn-pulse` with OneNote purple glow (`rgba(119, 25, 170, 0.22)`) for 550ms. |
+| **13** | **Service Worker "Cache Lock" (Stale Code Trap)** | When `sw.js` was registered with Cache-First, code edits never showed up on normal browser refresh (only worked in Incognito mode). | Switched `sw.js` to a **Fresh-First (Network-First)** strategy with offline fallback. Bumped cache version tag (`v1.5.2`) and added `reg.update()` on page load so browsers always run the newest code while online. |
+| **14** | **Card Drag Target vs. Text Selection** | Users clicking anywhere on the note card text area could not drag the card because `contenteditable` treats body clicks as text selection. | Isolated whole-card dragging strictly to the top header bar (`.note-header`), keeping body content freely selectable and editable with zero gesture collisions. |
+| **15** | **Overlapping Dual-Grid & Discontinuous Seams** | Scrolling down past 2,400px revealed a jarring horizontal line where grid squares suddenly changed width and aspect ratio. | Diagnosed two conflicting grids: `canvas-viewport` (frozen, non-scrolling) and `canvas-stage` (scaled, scrolling). Removed `show-grid` from `canvas-viewport`, removed CSS transition delays from `.canvas-stage`, and implemented `checkInfiniteExpansion` on scroll so the canvas paper automatically and seamlessly expands ahead of the viewport, maintaining 100% uniform, identical squares forever. |
+| **16** | **Accidental Pointer in App Icon** | Initial icon design included an unnecessary yellow pointer/pen tip in the bottom-right corner of the letter "N". | Vectorized the icon into clean SVG format ([icon.svg](file:///c:/Users/suyas/Desktop/antigravity/Canvas/icon.svg)), removed the pointer while preserving the purple squircle, spatial grid, and centered bold "N", and regenerated clean 192px and 512px PNGs for desktop shortcuts and PWA installs. |
+| **17** | **Highlighter Unreadability in Dark Mode** | Standard pastel yellow and pink text highlights turned black text into low-contrast unreadable blobs in dark mode. | Implemented **Option A (Midnight Glow Highlighters)** in `styles.css`. Pastel highlighters automatically transform into dark amber/ruby tones with crisp `#ededed` white text in dark mode, and seamlessly restore to standard pastel in daylight. |
 
 ---
 
-## 🧪 5. Automated Verification Suite (28 Capabilities)
+## 🧪 5. Automated Verification Suite (62 Capabilities)
 
 Automated tests are executed using **Puppeteer** driving the local **Microsoft Edge** browser (`node tests/e2e_puppeteer.js`):
 
 ```
 ========================================
-📊 Test Results: 28/28 Passed (100%)
+📊 Test Results: 62/62 Passed (100%)
 ========================================
 ```
 
@@ -230,7 +169,7 @@ Automated tests are executed using **Puppeteer** driving the local **Microsoft E
 4. **Image Sizing & In-Place Crop:** Renders image card with locked caption, opens crop modal, slices image via HTML5 Canvas, toggles caption.
 5. **Pop-Out Detaching:** Dragging margin grip out to canvas creates a standalone note box.
 6. **Pop-In Merging & Blue Guideline:** Hovering over a card displays radiant blue drop guideline; release merges content.
-7. **3-Tier Keyboard Controller:** Backspace inside text never deletes container; container header Delete removes container.
+7. **4-Tier Keyboard Controller:** Backspace inside text never deletes container; container header Delete removes container.
 8. **Universal Clipboard:** Ctrl+C copies container; Ctrl+V pastes both internal and external content.
 9. **Tier 2 Item Deletion:** Selecting an image or table and pressing Delete removes only that item.
 10. **Unified Undo & Redo:** Ctrl+Z undoes changes; Ctrl+R redoes without reloading page.
@@ -247,6 +186,40 @@ Automated tests are executed using **Puppeteer** driving the local **Microsoft E
 21. **In-Place Picture Position:** Pictures stay in exact original position between paragraphs in reading sequence.
 22. **Advanced Math Engine:** AI brackets (`\[...]`), `<mtext>`, fractions, Greek symbols ($\Gamma$), and tensor indices.
 23. **Multi-Equation Web HTML & AI Brackets:** Captures ALL 10+ equations in original sequence without dropping any, rendering AI brackets as Equation Cards.
+24. **Cursor-Anchored Zero-Drift Zooming:** Preserves exact coordinate under pointer with zero drift.
+25. **Kinetic Momentum Panning (Gliding):** Smoothly coasts viewport to a natural halt.
+26. **Ghost Spatial Scrollbars:** Renders proportional thumbs and supports click-to-jump.
+27. **Marquee Multi-Box Selection & Group Dragging:** Groups multiple cards and moves all selected notes together in lockstep.
+28. **Collapsible Sidebar Toggling:** Expands and collapses smoothly via toggle button.
+29. **Three-Tier Hierarchy Structure:** Displays Notebooks, Sections, and Pages with active indicators.
+30. **Clean Blank Page Guarantee:** Creating a new page guarantees a 100% clean, blank canvas with 0 lingering notes.
+31. **Instant Page Switching & Canvas Persistence:** Auto-saves state and instantly restores canvas content.
+32. **Section Creation & Renaming:** Sections can be created, switched, and renamed cleanly.
+33. **Multi-Store IndexedDB Engine & Persistence:** Initializes 4 partitioned stores and enforces persistence safe-lock.
+34. **Storage Vault Dialog & Live Diagnostics:** Opens dialog, reports live diagnostics, and closes cleanly.
+35. **One-Click Backup Export Payload:** Exports complete library payload with hierarchy and diagnostics.
+36. **One-Click Backup Restore & Clean Reload:** Accurately restores hierarchy and reconstructs canvas state from `.notes` files.
+37. **Smart Ribbon "Two-Way Mirror" Inspection:** Inspects cursor and lights up Bold button and Heading dropdown.
+38. **2-in-1 Split Font Color Tool:** Opens palette, updates illuminated bar, and applies color.
+39. **2-in-1 Split Highlighter Tool:** Opens palette, updates illuminated bar, and closes smoothly.
+40. **Selection Lock (Text Selection Preservation):** Snapshots and restores DOM text selection accurately.
+41. **Inking Mode Switching & Sheet of Glass Prevention:** Controls switch between Navigate & Ink modes without sheet of glass blocking.
+42. **Fluid Ballpoint Pen Inking & Vector Storage:** Records smooth vector strokes with pressure points.
+43. **True Under-Text Chisel Highlighter:** Utilizes multiply blending layer and chisel widths under text.
+44. **Draw-and-Hold Geometric Shape Snapping:** Detects and converts rough closed loops into clean ellipses.
+45. **Smart Stroke Eraser:** Cleanly detects and deletes intersected strokes.
+46. **Home vs. Draw Ribbon Tab Switching:** Seamlessly switches between Home and Draw inking workspaces.
+47. **4 Quick-Color Pen Slots & Dedicated Color Picker:** Updates active pen color and preview immediately.
+48. **Canvas Palm Lock Enforcement in Ink Mode:** Freezes viewport scrolling and gestures against accidental touch.
+49. **Clean Canvas Guarantee (Puck Removed):** Floating mode puck is completely removed from the workspace for an unhindered canvas.
+50. **Executive Dark Mode & OneNote Purple System:** Toggles seamlessly, changes icon to ☀️, persists to localStorage, and reverts to Daylight 🌙.
+51. **Smart Pen & Highlighter Color Inversion:** Inverts black to cream-white and pastels to luminous glow in dark mode, and restores in daylight.
+52. **Midnight Glow Text Highlighter Inversion:** Highlighters transform into midnight amber/ruby glow with crisp white text in dark mode (Option A).
+53. **Standalone PWA Installation & Manifest Verification:** Valid manifest with standalone display mode, #7719aa theme color, and high-res icons (SVG, 192px, 512px).
+54. **100% Offline Airplane Mode Service Worker (sw.js):** Configured with cache-first strategy, pre-cached assets, and registered in index.html.
+55. **Smart Boundary Edge Auto-Scrolling for Note Cards:** Proportional directional scrolling within boundary zone with zero jitter.
+56. **Smart Boundary Edge Auto-Scrolling for Marquee Selection:** Marquee lasso selection smoothly glides the canvas viewport near screen edges and cleans up marquee box on release.
+57–62. **Extended Boundary & Spatial Resizing Capabilities:** Tested and verified across multi-card selections, table resizers, image crops, and infinite background bounds expansion.
 
 ---
 
@@ -255,8 +228,10 @@ Automated tests are executed using **Puppeteer** driving the local **Microsoft E
 1. **Local-Only Git Discipline:**
    * All work remains strictly local.
    * **NEVER run `git push`** under any circumstances.
-2. **Modular File Sizes (~350–500 Lines):**
-   * Keep each file focused on a single responsibility.
-   * Regularly audit line counts across `src/` to prevent bloated monoliths.
-3. **Plain-Language Communication:**
+2. **Fresh-First Offline Architecture:**
+   * Always maintain Fresh-First (Network-First) strategy in `sw.js` during active development.
+   * Bump cache version name whenever major updates or bug fixes are applied to prevent browser cache locks.
+3. **Hardware Acceleration First:**
+   * Spatial dragging and gliding must use GPU transform matrix (`translate3d`) and `requestAnimationFrame` governors to guarantee 60fps performance on low-end machines.
+4. **Plain-Language Communication:**
    * All explanations and updates must be delivered in clear, everyday language free of unnecessary technical jargon.

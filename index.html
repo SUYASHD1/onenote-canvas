@@ -7,6 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="theme-color" content="#7719aa">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="OneNote Canvas">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="components.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -248,11 +255,14 @@
       </div>
       <div class="ribbon-divider"></div>
 
-      <!-- Section: Storage & Backup -->
+      <!-- Section: Storage & Backup & Theme -->
       <div class="ribbon-group">
         <button class="ribbon-btn" id="btn-storage-hub" title="Open Storage Vault & Backup Hub">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           <span>Vault & Backup</span>
+        </button>
+        <button class="ribbon-btn icon-only" id="btn-toggle-theme" title="Toggle Executive Dark Mode (🌙 / ☀️)">
+          <span id="theme-toggle-icon" style="font-size: 14px; line-height: 1;">🌙</span>
         </button>
       </div>
       </div>
@@ -310,7 +320,7 @@
     <!-- Canvas Container with Viewport and Floating Ghost Spatial Scrollbars -->
     <div class="canvas-container" id="canvas-container">
       <!-- Main Infinite Viewport with Fixed Top-Left Origin -->
-      <main class="canvas-viewport show-grid" id="canvas-viewport" tabindex="0">
+      <main class="canvas-viewport" id="canvas-viewport" tabindex="0">
         <!-- The Actual Drawing Surface that Expands Automatically Down & Right -->
         <div class="canvas-stage show-grid" id="canvas-stage">
           <!-- Live Drop / Insertion Guideline Marker (Radiant Blue Line) -->
@@ -404,7 +414,7 @@
             <div class="stat-val" id="stat-notes-count">3</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Storage Used</div>
+            <div class="stat-label">Notes Size</div>
             <div class="stat-val" id="stat-storage-size">--</div>
           </div>
           <div class="stat-card">
@@ -461,5 +471,13 @@
   <script src="src/ink_engine.js"></script>
   <script src="src/sidebar.js"></script>
   <script src="src/app.js"></script>
+  <script>
+    // Register 100% Offline Airplane Mode Service Worker (if served over http/https)
+    if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

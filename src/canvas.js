@@ -123,8 +123,12 @@ class OneNoteCanvas {
       }
 
       if (e.pointerType === 'touch') {
-        // Disregard touches starting on note boxes, modals, scrollbars, or controls
-        if (e.target.closest('.note-box, .crop-modal, .ghost-scrollbar, button, input, select, .ribbon-cluster')) {
+        // Disregard touches starting on modals, scrollbars, or interactive controls
+        if (e.target.closest('.crop-modal, .ghost-scrollbar, button, input, select')) {
+          return;
+        }
+        // If 1st touch starts on note box, let note box handle dragging unless 2nd finger arrives for pinch
+        if (activeTouches.size === 0 && e.target.closest('.note-box, .ribbon-cluster')) {
           return;
         }
 
@@ -206,12 +210,12 @@ class OneNoteCanvas {
             y: (touches[0].y + touches[1].y) / 2
           };
 
-          // Pinch zoom
+          // Smooth continuous geometric pinch zoom
           if (initialPinchDist && initialPinchDist > 5) {
-            const pinchDiff = curDist - initialPinchDist;
-            if (Math.abs(pinchDiff) > 3) {
-              const zoomDelta = pinchDiff / 320;
-              this.adjustZoom(zoomDelta, curCenter.x, curCenter.y);
+            const pinchRatio = curDist / initialPinchDist;
+            const zoomDelta = this.zoomLevel * (pinchRatio - 1);
+            if (Math.abs(zoomDelta) >= 0.001) {
+              this.adjustZoomContinuous(zoomDelta, curCenter.x, curCenter.y);
               initialPinchDist = curDist;
             }
           }
@@ -445,13 +449,25 @@ class OneNoteCanvas {
   }
 
   /**
-   * Adjust Zoom Level with Cursor-Anchored Zero-Drift Math
+   * Adjust Zoom Level with Cursor-Anchored Zero-Drift Math (Stepped for UI buttons)
    */
   adjustZoom(delta, clientX = null, clientY = null) {
     const prevZoom = this.zoomLevel;
     let nextZoom = Math.round((prevZoom + delta) * 10) / 10;
     nextZoom = Math.min(this.maxZoom, Math.max(this.minZoom, nextZoom));
     if (nextZoom === prevZoom) return;
+
+    this.applyZoomAt(nextZoom, clientX, clientY);
+  }
+
+  /**
+   * Continuous Sub-Pixel Zoom Math for Fluid Tablet Pinch-to-Zoom Gestures
+   */
+  adjustZoomContinuous(delta, clientX = null, clientY = null) {
+    const prevZoom = this.zoomLevel;
+    let nextZoom = Math.round((prevZoom + delta) * 1000) / 1000;
+    nextZoom = Math.min(this.maxZoom, Math.max(this.minZoom, nextZoom));
+    if (Math.abs(nextZoom - prevZoom) < 0.001) return;
 
     this.applyZoomAt(nextZoom, clientX, clientY);
   }

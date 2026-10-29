@@ -58,7 +58,11 @@ class InkEngine {
     this.highlighterCanvas.id = 'highlighter-draw-canvas';
     this.highlighterCanvas.className = 'ink-surface-layer under-text';
     this.highlighterCanvas.style.touchAction = 'none';
-    this.highlighterCtx = this.highlighterCanvas.getContext('2d');
+    try {
+      this.highlighterCtx = this.highlighterCanvas.getContext('2d', { desynchronized: true });
+    } catch (_) {
+      this.highlighterCtx = this.highlighterCanvas.getContext('2d');
+    }
     stage.insertBefore(this.highlighterCanvas, stage.firstChild);
 
     // 2. Main Inking Canvas (Layered for Pen & Eraser, z-index: 45)
@@ -66,7 +70,11 @@ class InkEngine {
     this.inkCanvas.id = 'active-draw-canvas';
     this.inkCanvas.className = 'ink-surface-layer over-text';
     this.inkCanvas.style.touchAction = 'none';
-    this.inkCtx = this.inkCanvas.getContext('2d');
+    try {
+      this.inkCtx = this.inkCanvas.getContext('2d', { desynchronized: true });
+    } catch (_) {
+      this.inkCtx = this.inkCanvas.getContext('2d');
+    }
     stage.appendChild(this.inkCanvas);
 
     // 3. Eraser Cursor Guide Element
@@ -369,7 +377,11 @@ class InkEngine {
       this.startShapeHoldTimer();
     });
 
-    canvas.addEventListener('pointermove', (e) => {
+    let lastEventTimeStamp = 0;
+    const handlePointerMove = (e) => {
+      if (e.timeStamp && e.timeStamp === lastEventTimeStamp) return;
+      if (e.timeStamp) lastEventTimeStamp = e.timeStamp;
+
       if (this.pencilOnly && e.pointerType === 'touch') return;
       if (this.isDrawing && this.activePointerId !== null && this.activePointerId !== e.pointerId) return;
 
@@ -411,7 +423,12 @@ class InkEngine {
 
       // Render all intermediate segments in a single batched GPU draw call
       this.drawBatchSegments(this.currentStroke, startLen);
-    });
+    };
+
+    if ('onpointerrawupdate' in window) {
+      canvas.addEventListener('pointerrawupdate', handlePointerMove);
+    }
+    canvas.addEventListener('pointermove', handlePointerMove);
 
     const stopDrawing = (e) => {
       if (!this.isDrawing) return;

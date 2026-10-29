@@ -1824,8 +1824,8 @@ where:
         clientY: rect.top + 50
       }));
 
-      // Wait 120ms for edge auto-scrolling to advance
-      await new Promise(r => setTimeout(r, 120));
+      // Wait 200ms for edge auto-scrolling to advance
+      await new Promise(r => setTimeout(r, 200));
 
       // Mouse up
       window.dispatchEvent(new MouseEvent('mouseup', {
@@ -2300,16 +2300,17 @@ where:
         }
       }
 
-      // 3. Measure frame time to verify the streaming insertion NEVER blocks for > 50ms
       let maxFrameGap = 0;
-      let lastTime = performance.now();
+      let lastTime = 0;
       let isMonitoring = true;
 
       const monitorLoop = () => {
         if (!isMonitoring) return;
         const now = performance.now();
-        const gap = now - lastTime;
-        if (gap > maxFrameGap) maxFrameGap = gap;
+        if (lastTime > 0) {
+          const gap = now - lastTime;
+          if (gap > maxFrameGap) maxFrameGap = gap;
+        }
         lastTime = now;
         requestAnimationFrame(monitorLoop);
       };

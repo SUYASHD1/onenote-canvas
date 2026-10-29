@@ -17,8 +17,12 @@ class HistoryManager {
     this.maxHistory = 50;
     this.isRestoring = false;
     this.saveTimeout = null;
+    this.storageTimer = null;
+    this.pendingStateToSave = null;
 
     this.bindGlobalShortcuts();
+    window.addEventListener('beforeunload', () => this.flushStorage());
+    window.addEventListener('pagehide', () => this.flushStorage());
   }
 
   /**
@@ -201,10 +205,32 @@ class HistoryManager {
     }, true); // Capture phase ensures browser reload is intercepted
   }
 
+  /**
+   * Non-blocking Storage Cooldown: buffers disk writes by 300ms so active typing/pasting
+   * never causes micro-stutters or pauses on mobile flash drives.
+   */
   persistToStorage(state) {
-    try {
-      localStorage.setItem('onenote_canvas_workspace', JSON.stringify(state));
-    } catch (_) {}
+    this.pendingStateToSave = state;
+    clearTimeout(this.storageTimer);
+    this.storageTimer = setTimeout(() => {
+      this.flushStorage();
+    }, 300);
+  }
+
+  /**
+   * Flush any buffered state immediately to disk (on page unload, pagehide, or manual save)
+   */
+  flushStorage() {
+    clearTimeout(this.storageTimer);
+    if (!this.pendingStateToSave && this.undoStack.length > 0) {
+      this.pendingStateToSave = this.undoStack[this.undoStack.length - 1];
+    }
+    if (this.pendingStateToSave) {
+      try {
+        localStorage.setItem('onenote_canvas_workspace', JSON.stringify(this.pendingStateToSave));
+      } catch (_) {}
+      this.pendingStateToSave = null;
+    }
   }
 
   loadFromStorage() {

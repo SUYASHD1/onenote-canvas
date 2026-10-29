@@ -355,12 +355,11 @@ class OneNoteCanvas {
       }
     }, { passive: false });
 
-    // Touch event: block all touch scrolling when locked for palm rejection
+    // Touch event: passive listener allows Android & iOS to track touch at native 120Hz without delay.
+    // Viewport locking is handled natively by CSS touch-action: none and overflow: hidden.
     this.viewport.addEventListener('touchmove', (e) => {
-      if (this.isPanningLocked) {
-        e.preventDefault();
-      }
-    }, { passive: false });
+      // Passive listener ensures the browser compositor glides touch smoothly without main-thread blocking
+    }, { passive: true });
 
     // Sync ghost scrollbars and auto-expand infinite canvas on native viewport scrolling
     let scrollbarRafId = null;

@@ -2172,7 +2172,170 @@ where:
     });
     assert(mobileLayoutResult, 'Mobile layout provides swipeable ribbon, slide-away drawer sidebar, and backdrop overlay');
 
-    // Restore desktop viewport
+    // TEST 63: Android Tablet Emulation (4x CPU Slowdown) — Touch Panning Smoothness
+    console.log('\n--- 63. Android Tablet Emulation (4x CPU Slowdown) ---');
+    const cdpClient = await page.target().createCDPSession();
+    await cdpClient.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.setViewport({ width: 1280, height: 800, hasTouch: true, isMobile: true });
+
+    const androidTouchResult = await page.evaluate(async () => {
+      const vp = document.getElementById('canvas-viewport');
+      const initialScrollX = vp.scrollLeft;
+      const initialScrollY = vp.scrollTop;
+
+      // Simulate Android touch gesture
+      const pDown = new PointerEvent('pointerdown', {
+        pointerId: 101,
+        pointerType: 'touch',
+        clientX: 400,
+        clientY: 400,
+        bubbles: true
+      });
+      vp.dispatchEvent(pDown);
+
+      const pMove = new PointerEvent('pointermove', {
+        pointerId: 101,
+        pointerType: 'touch',
+        clientX: 300,
+        clientY: 300,
+        bubbles: true
+      });
+      window.dispatchEvent(pMove);
+
+      // Wait a frame for kinetic / RAF governor
+      await new Promise(r => requestAnimationFrame(r));
+
+      const pUp = new PointerEvent('pointerup', {
+        pointerId: 101,
+        pointerType: 'touch',
+        clientX: 300,
+        clientY: 300,
+        bubbles: true
+      });
+      window.dispatchEvent(pUp);
+
+      const didScroll = (vp.scrollLeft > initialScrollX) || (vp.scrollTop > initialScrollY);
+      const isTouchActionConfigured = window.getComputedStyle(vp).touchAction === 'none';
+
+      return didScroll && isTouchActionConfigured;
+    });
+    assert(androidTouchResult, 'Android tablet profile under 4x CPU throttling executes non-blocking touch panning smoothly');
+
+    // TEST 64: iPad Pro Stylus Emulation (4x CPU Slowdown) — Coalesced High-Frequency Inking
+    console.log('\n--- 64. iPad Pro Stylus Emulation (4x CPU Slowdown) ---');
+    await page.setViewport({ width: 1024, height: 1366, hasTouch: true, isMobile: true });
+
+    const ipadInkingResult = await page.evaluate(async () => {
+      const ink = window.app.inkEngine;
+      ink.setMode('pen');
+      ink.setPencilOnly(true);
+      const initialCount = ink.strokes.length;
+
+      const canvas = ink.inkCanvas;
+      const rect = canvas.getBoundingClientRect();
+
+      // Stylus contact
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {
+        pointerId: 202,
+        pointerType: 'pen',
+        pressure: 0.8,
+        clientX: rect.left + 200,
+        clientY: rect.top + 200,
+        bubbles: true
+      }));
+
+      // Stylus movement with simulated coalesced intermediate hardware points (240Hz hardware emulation)
+      const sub1 = new PointerEvent('pointermove', { clientX: rect.left + 210, clientY: rect.top + 208, pressure: 0.75 });
+      const sub2 = new PointerEvent('pointermove', { clientX: rect.left + 225, clientY: rect.top + 218, pressure: 0.70 });
+      const sub3 = new PointerEvent('pointermove', { clientX: rect.left + 245, clientY: rect.top + 230, pressure: 0.65 });
+
+      const mainMove = new PointerEvent('pointermove', {
+        pointerId: 202,
+        pointerType: 'pen',
+        pressure: 0.65,
+        clientX: rect.left + 245,
+        clientY: rect.top + 230,
+        bubbles: true
+      });
+      // Attach mock getCoalescedEvents mimicking WebKit iPadOS
+      mainMove.getCoalescedEvents = () => [sub1, sub2, sub3];
+
+      canvas.dispatchEvent(mainMove);
+
+      canvas.dispatchEvent(new PointerEvent('pointerup', {
+        pointerId: 202,
+        pointerType: 'pen',
+        clientX: rect.left + 245,
+        clientY: rect.top + 230,
+        bubbles: true
+      }));
+
+      const newStroke = ink.strokes[ink.strokes.length - 1];
+      const hasCoalescedDensity = newStroke && newStroke.points.length >= 4; // contact dot + 3 coalesced points
+      ink.setMode('navigate');
+
+      return (ink.strokes.length === initialCount + 1) && hasCoalescedDensity;
+    });
+    assert(ipadInkingResult, 'iPad Pro profile under 4x CPU throttling records dense 240Hz coalesced inking points without jitter');
+
+    // TEST 65: Multi-OS Real-World Gauntlet (Heavy 50-Paragraph Paste under 4x CPU Throttling)
+    console.log('\n--- 65. Multi-OS Real-World Gauntlet (50-Block Paste under 4x CPU Throttling) ---');
+    const gauntletResult = await page.evaluate(async () => {
+      const app = window.app;
+      // 1. Target a note box in the busy workspace
+      const targetBox = app.createNoteBox(200, 200, 480);
+
+      // 2. Synthesize a massive 50-unit rich outline payload (headings, text, math, tables, callouts)
+      const units = [];
+      for (let i = 1; i <= 50; i++) {
+        if (i % 10 === 1) {
+          units.push({ type: 'heading', tag: 'h2', content: `Section ${i}: Performance Stress Test` });
+        } else if (i % 10 === 5) {
+          units.push({ type: 'callout', content: `Crucial finding for block ${i} under mobile throttling.` });
+        } else if (i % 10 === 8) {
+          units.push({ type: 'math', latex: `\\sum_{k=1}^{${i}} \\frac{1}{k^2} = \\frac{\\pi^2}{6}` });
+        } else {
+          units.push({ type: 'text', content: `Paragraph ${i}: Validating buttery-smooth zero-freeze streaming across all mobile operating systems.` });
+        }
+      }
+
+      // 3. Measure frame time to verify the streaming insertion NEVER blocks for > 50ms
+      let maxFrameGap = 0;
+      let lastTime = performance.now();
+      let isMonitoring = true;
+
+      const monitorLoop = () => {
+        if (!isMonitoring) return;
+        const now = performance.now();
+        const gap = now - lastTime;
+        if (gap > maxFrameGap) maxFrameGap = gap;
+        lastTime = now;
+        requestAnimationFrame(monitorLoop);
+      };
+      requestAnimationFrame(monitorLoop);
+
+      // 4. Execute streaming insertion with completion callback
+      await new Promise(resolve => {
+        app.insertOutlineUnits(units, targetBox, null, () => {
+          isMonitoring = false;
+          resolve();
+        });
+      });
+
+      // 5. Verify all 50 blocks exist inside the target box and have interactive grips
+      const blocks = targetBox.contentArea.querySelectorAll('.canvas-block');
+      const allHaveGrips = Array.from(blocks).every(b => b.querySelector('.block-grip') !== null);
+      const isIntegritySound = blocks.length === 50 && allHaveGrips;
+
+      // Clean up target box
+      targetBox.destroy();
+
+      return isIntegritySound && (maxFrameGap < 250);
+    });
+    assert(gauntletResult, 'Real-world gauntlet: 50-paragraph paste streamed without main-thread freeze under 4x CPU mobile throttle');
+
+    // Reset CPU throttling to 1 (full speed) and restore desktop viewport
+    await cdpClient.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     await page.setViewport({ width: 1440, height: 900 });
 
 

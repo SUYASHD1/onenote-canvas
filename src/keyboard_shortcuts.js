@@ -511,9 +511,10 @@ class KeyboardController {
         targetBox.contentArea.innerHTML = '';
       }
 
-      this.app.insertOutlineUnits(units, targetBox, anchorBlock);
+      this.app.insertOutlineUnits(units, targetBox, anchorBlock, () => {
+        if (this.app.history) this.app.history.pushState(pasteSourceType === 'ai_markdown' ? 'paste_ai_markdown' : 'paste_rich_content');
+      });
       this.app.selectNoteBox(targetBox);
-      if (this.app.history) this.app.history.pushState(pasteSourceType === 'ai_markdown' ? 'paste_ai_markdown' : 'paste_rich_content');
       return;
     }
 

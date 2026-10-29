@@ -384,18 +384,27 @@ class InkEngine {
         return;
       }
 
-      // Check distance moved for Draw-and-Hold shape snapping
-      if (this.lastPointerPos) {
-        const dist = Math.hypot(pos.x - this.lastPointerPos.x, pos.y - this.lastPointerPos.y);
-        if (dist > 14) {
-          this.lastPointerPos = pos;
-          this.startShapeHoldTimer(); // Reset stillness timer
-        }
-      }
+      // Apple Pencil & S-Pen Coalesced Events: Pull high-frequency 240Hz intermediate points
+      const coalesced = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+      const eventsList = (coalesced && coalesced.length > 0) ? coalesced : [e];
 
-      this.currentStroke.points.push({ x: pos.x, y: pos.y, p: e.pressure || 0.5 });
-      // Buttery smooth incremental segment rendering (0ms lag, no full-canvas clears)
-      this.drawLatestSegment(this.currentStroke);
+      for (let i = 0; i < eventsList.length; i++) {
+        const subEvent = eventsList[i];
+        const subPos = this.getCanvasCoords(subEvent);
+
+        // Check distance moved for Draw-and-Hold shape snapping
+        if (this.lastPointerPos) {
+          const dist = Math.hypot(subPos.x - this.lastPointerPos.x, subPos.y - this.lastPointerPos.y);
+          if (dist > 14) {
+            this.lastPointerPos = subPos;
+            this.startShapeHoldTimer(); // Reset stillness timer
+          }
+        }
+
+        this.currentStroke.points.push({ x: subPos.x, y: subPos.y, p: subEvent.pressure || 0.5 });
+        // Buttery smooth incremental segment rendering (0ms lag, no full-canvas clears)
+        this.drawLatestSegment(this.currentStroke);
+      }
     });
 
     const stopDrawing = (e) => {
